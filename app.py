@@ -1460,8 +1460,16 @@ def view_assessment(assessment_id: int):
     if not assessment:
         flash("Relatório não localizado.")
         return redirect(url_for("assessments"))
+        
     result = compute_assessment(assessment_id)
     level_name, level_class, explanation = result["level"]
+
+    questions_by_category = {}
+    for row in result["rows"]:
+        cat = row["category"]
+        if cat not in questions_by_category:
+            questions_by_category[cat] = []
+        questions_by_category[cat].append(row)
 
     gaps = query_db(
         """
@@ -1484,7 +1492,7 @@ def view_assessment(assessment_id: int):
 
     content = render_template_string(
         """
-        <div class="card" style="background:var(--fg); color:white;">
+        <div class="card" style="background:var(--fg); color:white; margin-bottom: 30px;">
           <div class="report-header-flex" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap: 15px;">
             <div>
               <span class="pill" style="background:white; color:var(--fg); border:none; margin-bottom:10px;">RELATÓRIO_FINAL</span>
@@ -1506,37 +1514,53 @@ def view_assessment(assessment_id: int):
           </div>
         </div>
 
-        <div class="grid-form" style="align-items: start;">
-          <div class="card">
-            <h2>Pontuação_Dimensão</h2>
-            <div class="table-wrap" style="margin-top:15px;">
-              <table>
-                <tr><th>Domínio_TI</th><th>Score</th><th>Leitura</th></tr>
-                {% for cat, data in result.segments.items() %}
-                  <tr>
-                    <td style="font-weight: 700;">{{ cat }}</td>
-                    <td style="color: var(--p-primary); font-weight: 700; font-size:16px;">{{ '%.1f'|format(data.score) }}%</td>
-                    <td style="font-size: 13px;">{{ data.level[2] }}</td>
-                  </tr>
-                {% endfor %}
-              </table>
-            </div>
-          </div>
-
-          <div class="card">
-            <h2>Legenda_Níveis</h2>
-            <div style="display:flex; flex-direction:column; gap: 8px; margin-top:15px; font-size:13px;">
-              <div style="padding: 10px; background: #ffcccc; border: var(--border-thin); color:#900;"><strong>[0-59%] Reativo:</strong> Caótico, dependente de heróis.</div>
-              <div style="padding: 10px; background: #ffeb99; border: var(--border-thin); color:#960;"><strong>[60-79%] Proativo:</strong> Processos básicos, prevenção.</div>
-              <div style="padding: 10px; background: #cce0ff; border: var(--border-thin); color:#049;"><strong>[80-89%] Otimizado:</strong> Medido, alinhado ao negócio.</div>
-              <div style="padding: 10px; background: #ccffeb; border: var(--border-thin); color:#064;"><strong>[90-100%] Estratégico:</strong> Inovador, gera valor.</div>
-            </div>
+        <div class="card" style="margin-bottom: 30px;">
+          <h2>Legenda_Níveis</h2>
+          <div class="grid-form" style="margin-top:15px; font-size:13px;">
+            <div style="padding: 10px; background: #ffcccc; border: var(--border-thin); color:#900;"><strong>[0-59%] Reativo:</strong> Caótico, dependente.</div>
+            <div style="padding: 10px; background: #ffeb99; border: var(--border-thin); color:#960;"><strong>[60-79%] Proativo:</strong> Processos básicos.</div>
+            <div style="padding: 10px; background: #cce0ff; border: var(--border-thin); color:#049;"><strong>[80-89%] Otimizado:</strong> Medido e alinhado.</div>
+            <div style="padding: 10px; background: #ccffeb; border: var(--border-thin); color:#064;"><strong>[90-100%] Estratégico:</strong> Gera valor.</div>
           </div>
         </div>
 
-        <div class="card" style="border-color:var(--p-danger);">
+        <div style="margin-bottom: 30px;">
+          <h2 style="margin-bottom: 20px;">Análise_Gráfica_Por_Domínio</h2>
+          <div style="display: flex; flex-direction: column; gap: 20px;">
+            {% for cat, data in result.segments.items() %}
+              <div class="card" style="padding: 20px; box-shadow: var(--shadow-raw-sm);">
+                
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;">
+                  <h3 style="margin: 0; text-decoration: none; font-size: 18px; background: var(--fg); color: white; padding: 4px 10px;">{{ cat|upper }}</h3>
+                  <strong style="font-size: 22px; color: var(--fg);">{{ '%.1f'|format(data.score) }}%</strong>
+                </div>
+                
+                <div style="width: 100%; height: 20px; border: var(--border-thick); background: var(--bg); margin-bottom: 20px;">
+                  <div style="height: 100%; background: var(--fg); width: {{ data.score }}%;"></div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; padding-left: 10px; border-left: 3px solid var(--p-primary);">
+                  {% for q in questions_by_category[cat] %}
+                    <div>
+                      <div style="display: flex; justify-content: space-between; align-items: flex-start; font-size: 13px; margin-bottom: 4px; gap: 10px;">
+                        <span style="font-weight: 700; line-height: 1.2;">{{ q.text }}</span>
+                        <span style="white-space: nowrap; font-family: 'Archivo Black', sans-serif;">{{ q.score }} / 5</span>
+                      </div>
+                      <div style="width: 100%; height: 8px; border: var(--border-thin); background: var(--bg);">
+                        <div style="height: 100%; background: var(--p-primary); width: {{ (q.score / 5) * 100 }}%;"></div>
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+                
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="card" style="border-color:var(--p-danger); margin-bottom: 30px;">
           <h2 style="background:var(--p-danger);">Gaps_Críticos / Plano_Ação</h2>
-          <p class="muted" style="margin-top:5px;">Notas baixa (0, 1 ou 2) exigem atenção imediata.</p>
+          <p class="muted" style="margin-top:5px;">Notas baixas (0, 1 ou 2) exigem atenção imediata.</p>
           <div class="table-wrap" style="margin-top:15px;">
             <table>
               <tr><th>Domínio</th><th>Quesito</th><th>Nota</th><th>Providência_Recomendada</th></tr>
@@ -1554,7 +1578,7 @@ def view_assessment(assessment_id: int):
           </div>
         </div>
 
-        <div class="card" style="border-color:var(--p-success);">
+        <div class="card" style="border-color:var(--p-success); margin-bottom: 30px;">
           <h2 style="background:var(--p-success);">Pontos_Fortes / Evidências</h2>
           <p class="muted" style="margin-top:5px;">Conformidade alta (nota 4 ou 5).</p>
           <div class="table-wrap" style="margin-top:15px;">
@@ -1574,7 +1598,7 @@ def view_assessment(assessment_id: int):
           </div>
         </div>
 
-        <div class="actions-bottom-flex" style="display: flex; gap: 15px; justify-content: flex-end; margin-bottom: 30px; border-top:var(--border-thick); padding-top:20px;">
+        <div class="actions-bottom-flex" style="display: flex; gap: 15px; justify-content: flex-end; border-top:var(--border-thick); padding-top:20px;">
           <a class="btn secondary" href="{{ url_for('answer_assessment', assessment_id=assessment.id) }}">revisar_respostas</a>
           <button class="btn" onclick="window.print()">[ imprimir_PDF ]</button>
         </div>
@@ -1586,6 +1610,7 @@ def view_assessment(assessment_id: int):
         explanation=explanation,
         strengths=strengths,
         gaps=gaps,
+        questions_by_category=questions_by_category, 
     )
     return layout(content, title=f"RELATÓRIO: {assessment['company_name']}")
 
