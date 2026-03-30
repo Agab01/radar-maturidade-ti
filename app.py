@@ -1403,7 +1403,7 @@ def answer_assessment(assessment_id: int):
               
               <h2 style="font-family:'Space Mono'; text-transform:none; background:none; color:var(--fg); padding:0; margin-bottom:10px;">{{ q.text }}</h2>
               {% if q.guidance %}
-                <p style="font-size: 13px; background: var(--bg); padding: 10px; border: var(--border-thin);">ℹ️ <strong>GUIA:</strong> {{ q.guidance }}</p>
+                <p style="font-size: 13px; background: var(--bg); padding: 10px; border: var(--border-thin);"><strong>GUIA:</strong> {{ q.guidance }}</p>
               {% endif %}
               
               <div class="grid-form" style="margin-top: 20px;">
