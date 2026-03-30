@@ -314,6 +314,10 @@ BASE_HTML = """
       .grid-form { grid-template-columns: 1fr; }
     }
   </style>
+  <script>
+    window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  </script>
+  <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <div class="app-wrap">
@@ -610,6 +614,10 @@ def login():
             .hint { text-align: center; margin-top: 25px; font-size: 12px; border-top: 1px solid #ccc; padding-top: 15px; color: #555;}
             .hint strong { color: var(--fg); }
           </style>
+          <script>
+            window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+          </script>
+          <script defer src="/_vercel/insights/script.js"></script>
         </head>
         <body>
           <div class="login-card">
