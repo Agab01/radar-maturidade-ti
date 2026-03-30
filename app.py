@@ -65,7 +65,7 @@ BASE_HTML = """
 <html lang="pt-br">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
   <title>{{ title or 'RADAR.TI' }}</title>
   <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
@@ -108,8 +108,8 @@ BASE_HTML = """
       letter-spacing: -1px;
     }
     
-    h1 { font-size: 42px; line-height: 0.9; }
-    h2 { font-size: 28px; background: var(--fg); color: white; display: inline-block; padding: 5px 10px; }
+    h1 { font-size: 42px; line-height: 0.9; word-wrap: break-word; }
+    h2 { font-size: 28px; background: var(--fg); color: white; display: inline-block; padding: 5px 10px; word-wrap: break-word; }
     h3 { font-size: 20px; text-decoration: underline; }
     
     p { margin: 0 0 15px 0; font-size: 15px; }
@@ -132,7 +132,7 @@ BASE_HTML = """
     }
     .brand { display: flex; align-items: center; gap: 15px; }
     .brand-logo {
-      width: 50px; height: 50px;
+      width: 50px; height: 50px; min-width: 50px;
       background: var(--fg); color: var(--p-accent);
       display: grid; place-items: center;
       font-family: 'Archivo Black', sans-serif; font-size: 28px;
@@ -181,14 +181,22 @@ BASE_HTML = """
       border: var(--border-thick);
       padding: 25px;
       box-shadow: var(--shadow-raw);
+      overflow-wrap: break-word;
     }
 
-    .table-wrap { overflow-x: auto; }
+    /* Tabelas Responsivas */
+    .table-wrap { 
+      width: 100%;
+      overflow-x: auto; 
+      -webkit-overflow-scrolling: touch;
+      border: var(--border-thick);
+      background: var(--surface);
+      margin-bottom: 15px;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
-      border: var(--border-thick);
-      margin-bottom: 15px;
+      min-width: 600px; /* Garante que a tabela não esmague em telas pequenas */
     }
     th {
       background: var(--fg); color: white;
@@ -213,7 +221,7 @@ BASE_HTML = """
       color: white;
       border: var(--border-thin);
       cursor: pointer;
-      display: inline-flex; align-items: center; gap: 8px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
       transition: all 0.1s;
       text-decoration: none;
     }
@@ -245,6 +253,8 @@ BASE_HTML = """
       font-family: inherit; font-size: 14px;
       color: var(--fg);
       outline: none;
+      -webkit-appearance: none; /* Corrige visual em iOS */
+      border-radius: 0;
     }
     input:focus, select:focus, textarea:focus {
       background: #f8f8f8;
@@ -268,6 +278,7 @@ BASE_HTML = """
       font-size: 12px;
       text-transform: uppercase;
       border: var(--border-thin);
+      text-align: center;
     }
     .p-artesanal { background: #ffcccc; color: #990000; }
     .p-eficiente { background: #ffeb99; color: #997300; }
@@ -307,11 +318,56 @@ BASE_HTML = """
       flex-wrap: wrap;
     }
 
-    @media (max-width: 600px) {
-      .main-header { flex-direction: column; text-align: center; gap: 10px; }
-      .user-info { text-align: center; }
-      h1 { font-size: 32px; }
+    /* ========================================================= */
+    /* REGRAS DE RESPONSIVIDADE (MOBILE & TABLET) */
+    /* ========================================================= */
+    @media (max-width: 768px) {
+      body { padding: 10px; background-size: 15px 15px; }
+      
+      .main-header { 
+        flex-direction: column; 
+        text-align: center; 
+        gap: 15px; 
+        padding: 15px; 
+      }
+      .brand { flex-direction: column; gap: 10px; }
+      .user-info { text-align: center; width: 100%; border-top: var(--border-thin); padding-top: 10px; }
+      
+      h1 { font-size: 28px; }
+      h2 { font-size: 20px; }
+      
+      .main-nav { flex-direction: column; padding: 10px; gap: 8px; }
+      .main-nav a { text-align: center; width: 100%; padding: 12px; }
+
+      .card { padding: 15px; }
       .grid-form { grid-template-columns: 1fr; }
+      
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .score { font-size: 32px; }
+
+      /* Tabelas no Mobile (Habilita scroll nativo suave na wrapper) */
+      .table-wrap { border: var(--border-thick); }
+      table { border: none; }
+      th, td { padding: 10px 8px; font-size: 13px; }
+
+      /* Botões de Ação na Tabela */
+      .actions-flex { flex-direction: column; width: 100%; }
+      .actions-flex .btn, .actions-flex form, .actions-flex button { width: 100%; margin: 0; }
+
+      /* Layouts Específicos de Páginas */
+      .flex-header-actions { flex-direction: column; gap: 10px; align-items: stretch !important; }
+      .flex-header-actions .btn { width: 100%; }
+
+      /* Relatório View_Assessment */
+      .report-header-flex { flex-direction: column; align-items: stretch !important; gap: 15px; }
+      .report-score-box { text-align: center; width: 100%; }
+      .report-score-box .score { font-size: 46px !important; }
+    }
+
+    @media (max-width: 480px) {
+      .stat-grid { grid-template-columns: 1fr; } /* Coluna única para dados no celular em pé */
+      .actions-bottom-flex { flex-direction: column; align-items: stretch !important; }
+      .actions-bottom-flex .btn { width: 100%; text-align: center; }
     }
   </style>
   <script>
@@ -507,7 +563,7 @@ def compute_assessment(assessment_id: int) -> Dict:
         JOIN questions q ON q.id = r.question_id
         WHERE r.assessment_id = %s
         ORDER BY q.category, q.id
-        """,
+        """ ,
         (assessment_id,),
     )
     if not rows:
@@ -568,7 +624,7 @@ def login():
         <html lang="pt-br">
         <head>
           <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
           <title>{{ title }}</title>
           <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
           <style>
@@ -591,12 +647,12 @@ def login():
               width: 100%; max-width: 460px;
             }
             .login-header { text-align: center; margin-bottom: 30px; border-bottom: var(--border-thick); padding-bottom: 20px; }
-            .logo-wrap { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+            .logo-wrap { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
             .logo-icon {
               width: 50px; height: 50px; background: var(--fg); color: var(--p-accent);
               display: grid; place-items: center; font-family: 'Archivo Black', sans-serif; font-size: 28px;
             }
-            h1 { font-family: 'Archivo Black', sans-serif; font-size: 26px; text-transform: uppercase; margin: 0; letter-spacing: -1px; line-height: 1; }
+            h1 { font-family: 'Archivo Black', sans-serif; font-size: 26px; text-transform: uppercase; margin: 0; letter-spacing: -1px; line-height: 1; word-wrap: break-word;}
             
             .alert { background: #ff595e; color: white; padding: 10px; border: 1px solid var(--fg); font-weight: 700; font-size: 13px; margin-bottom: 20px; text-align: center; }
 
@@ -604,7 +660,7 @@ def login():
             label { display: block; font-size: 14px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
             input {
               width: 100%; padding: 12px; border: var(--border-thick); background: var(--surface);
-              font-family: inherit; font-size: 14px; color: var(--fg); outline: none;
+              font-family: inherit; font-size: 14px; color: var(--fg); outline: none; -webkit-appearance: none; border-radius: 0;
             }
             input:focus { border-color: var(--p-primary); background: #f8f8f8; }
             
@@ -615,16 +671,12 @@ def login():
             }
             button:hover { transform: translate(-3px, -3px); box-shadow: var(--shadow-raw-sm); }
             
-            .hint { text-align: center; margin-top: 25px; font-size: 12px; border-top: 1px solid #ccc; padding-top: 15px; color: #555;}
-            .hint strong { color: var(--fg); }
+            @media (max-width: 480px) {
+                .login-card { padding: 20px; }
+                h1 { font-size: 20px; }
+            }
           </style>
-          <script>
-            window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
-          </script>
           <script defer src="/_vercel/insights/script.js"></script>
-          <script>
-            window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };
-          </script>
           <script defer src="/_vercel/speed-insights/script.js"></script>
         </head>
         <body>
@@ -632,7 +684,7 @@ def login():
             <div class="login-header">
               <div class="logo-wrap">
                 <div class="logo-icon">R</div>
-                <h1>RADAR.MATURIDADE_TI</h1>
+                <h1>RADAR.MATURIDADE</h1>
               </div>
               <p class="muted">Acesso restrito. Identifique-se.</p>
             </div>
@@ -697,7 +749,7 @@ def dashboard():
         </div>
         
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+          <div class="flex-header-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
             <h2>Avaliações_Recentes</h2>
             <a class="btn accent" href="{{ url_for('new_assessment') }}">++ Nova</a>
           </div>
@@ -768,7 +820,7 @@ def users():
               <select name="role">{% for role in roles %}<option value="{{ role }}">{{ role|upper }}</option>{% endfor %}</select>
             </div>
             <div style="grid-column: 1 / -1; text-align: right;">
-              <button class="btn accent" type="submit">Salvar_Registro</button>
+              <button class="btn accent" type="submit" style="width:100%; max-width:250px;">Salvar_Registro</button>
             </div>
           </form>
         </div>
@@ -850,7 +902,7 @@ def edit_user(user_id):
                 {% endfor %}
               </select>
             </div>
-            <div style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
+            <div class="actions-bottom-flex" style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
               <a href="{{ url_for('users') }}" class="btn secondary">Cancelar</a>
               <button class="btn accent" type="submit">Salvar_Alterações</button>
             </div>
@@ -919,7 +971,7 @@ def companies():
             <div class="form-group"><label>Nome_Contato</label><input name="contact_name"></div>
             <div class="form-group"><label>E-mail_Contato</label><input name="contact_email" type="email"></div>
             <div style="grid-column: 1 / -1; text-align: right;">
-              <button class="btn accent" type="submit">Registrar</button>
+              <button class="btn accent" type="submit" style="width:100%; max-width:250px;">Registrar</button>
             </div>
           </form>
           {% else %}
@@ -939,7 +991,7 @@ def companies():
                 <td style="font-weight: 700;">{{ c.size or '-' }}</td>
                 <td>
                   {% if c.contact_name %}
-                    {{ c.contact_name }} / <span style="font-size:12px;">{{ c.contact_email }}</span>
+                    {{ c.contact_name }} <br><span style="font-size:12px;">{{ c.contact_email }}</span>
                   {% else %}-{% endif %}
                 </td>
                 <td>
@@ -1003,7 +1055,7 @@ def edit_company(company_id):
             </div>
             <div class="form-group"><label>Nome_Contato</label><input name="contact_name" value="{{ company.contact_name or '' }}"></div>
             <div class="form-group"><label>E-mail_Contato</label><input name="contact_email" type="email" value="{{ company.contact_email or '' }}"></div>
-            <div style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
+            <div class="actions-bottom-flex" style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
               <a href="{{ url_for('companies') }}" class="btn secondary">Cancelar</a>
               <button class="btn accent" type="submit">Salvar_Alterações</button>
             </div>
@@ -1071,7 +1123,7 @@ def questions():
               <textarea name="guidance" style="min-height: 50px;"></textarea>
             </div>
             <div style="grid-column: 1 / -1; text-align: right;">
-              <button class="btn accent" type="submit">Gravar no Framework</button>
+              <button class="btn accent" type="submit" style="width:100%; max-width:250px;">Gravar no Framework</button>
             </div>
           </form>
           {% else %}
@@ -1163,7 +1215,7 @@ def edit_question(question_id):
               <label>Guia de Avaliação (Instruções)</label>
               <textarea name="guidance" style="min-height: 50px;">{{ question.guidance or '' }}</textarea>
             </div>
-            <div style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
+            <div class="actions-bottom-flex" style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
               <a href="{{ url_for('questions') }}" class="btn secondary">Cancelar</a>
               <button class="btn accent" type="submit">Salvar_Quesito</button>
             </div>
@@ -1204,7 +1256,7 @@ def assessments():
     content = render_template_string(
         """
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+          <div class="flex-header-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
             <h2>Log_Avaliações</h2>
             {% if has_perm('respond') %}
             <a class="btn accent" href="{{ url_for('new_assessment') }}">++ Iniciar</a>
@@ -1337,14 +1389,14 @@ def answer_assessment(assessment_id: int):
     content = render_template_string(
         """
         <div class="card" style="margin-bottom: 20px; background:var(--fg); color:var(--p-accent);">
-          <h1>#Questionário_Avaliação</h1>
+          <h1 style="color:var(--p-accent);">#Questionário_Avaliação</h1>
           <p style="margin:0;">[ ID_AVALIAÇÃO: {{ assessment.id }} ] | Responda todos os quesitos abaixo.</p>
         </div>
         
         <form method="post">
           {% for q in questions %}
             <div class="card" style="margin-bottom:20px; border-color:var(--p-primary);">
-              <div style="display:flex; justify-content:space-between; margin-bottom: 10px; border-bottom:var(--border-thin); padding-bottom:5px;">
+              <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 15px; border-bottom:var(--border-thin); padding-bottom:10px; flex-wrap: wrap; gap:10px;">
                 <span class="pill" style="background:var(--fg); color:white; border:none;">{{ q.category }}</span>
                 <strong class="muted">QUESITO {{ loop.index }}</strong>
               </div>
@@ -1379,8 +1431,8 @@ def answer_assessment(assessment_id: int):
             </div>
           {% endfor %}
           
-          <div style="position: sticky; bottom: 10px; z-index: 10; padding: 15px; background: var(--surface); border: var(--border-thick); box-shadow: var(--shadow-raw); text-align: right;">
-            <button class="btn accent" type="submit" style="font-size: 16px; padding: 15px 30px;">[ FINALIZAR_E_GERAR_RELATÓRIO ]</button>
+          <div style="position: sticky; bottom: 0; z-index: 10; padding: 15px; background: var(--surface); border-top: var(--border-thick); border-left: var(--border-thick); border-right: var(--border-thick); box-shadow: 0 -5px 15px rgba(0,0,0,0.1); text-align: center;">
+            <button class="btn accent" type="submit" style="font-size: 16px; padding: 15px 30px; width: 100%; max-width: 400px;">[ FINALIZAR_E_GERAR ]</button>
           </div>
         </form>
         """,
@@ -1433,18 +1485,18 @@ def view_assessment(assessment_id: int):
     content = render_template_string(
         """
         <div class="card" style="background:var(--fg); color:white;">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap: 15px;">
+          <div class="report-header-flex" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap: 15px;">
             <div>
               <span class="pill" style="background:white; color:var(--fg); border:none; margin-bottom:10px;">RELATÓRIO_FINAL</span>
-              <h1 style="color:var(--p-accent); font-size:38px;">{{ assessment.company_name }}</h1>
-              <p style="margin: 5px 0 0 0; font-weight:700;">Setor: {{ assessment.sector or '?' }} | Porte: {{ assessment.size or '?' }}</p>
-              <p class="muted" style="margin-top:5px; font-size:13px;">Avaliador: {{ assessment.evaluator_name }} | Encerrado: {{ assessment.completed_at[:10] if assessment.completed_at else 'PENDENTE' }}</p>
+              <h1 style="color:var(--p-accent); font-size:38px; line-height:1.1;">{{ assessment.company_name }}</h1>
+              <p style="margin: 10px 0 0 0; font-weight:700;">Setor: {{ assessment.sector or '?' }} | Porte: {{ assessment.size or '?' }}</p>
+              <p class="muted" style="margin-top:5px; font-size:13px;">Avaliador: {{ assessment.evaluator_name }} <br>Encerrado: {{ assessment.completed_at[:10] if assessment.completed_at else 'PENDENTE' }}</p>
             </div>
             
-            <div style="text-align: right; background:white; color:var(--fg); border:var(--border-thick); padding: 15px; box-shadow: 5px 5px 0 var(--p-accent);">
+            <div class="report-score-box" style="text-align: right; background:white; color:var(--fg); border:var(--border-thick); padding: 15px; box-shadow: 5px 5px 0 var(--p-accent);">
               <div style="font-size: 11px; text-transform: uppercase; font-weight: 700;">Score_Geral</div>
               <div class="score" style="font-size: 58px; margin: 0; line-height:1;">{{ '%.1f'|format(result.overall) }}<span style="font-size:28px;">%</span></div>
-              <span class="pill {{ level_class }}" style="border-width:2px; margin-top:5px;">{{ level_name }}</span>
+              <span class="pill {{ level_class }}" style="border-width:2px; margin-top:10px;">{{ level_name }}</span>
             </div>
           </div>
           
@@ -1474,10 +1526,10 @@ def view_assessment(assessment_id: int):
           <div class="card">
             <h2>Legenda_Níveis</h2>
             <div style="display:flex; flex-direction:column; gap: 8px; margin-top:15px; font-size:13px;">
-              <div style="padding: 8px; background: #ffcccc; border: var(--border-thin); color:#900;"><strong>[0-59%] Rreativo:</strong> Caótico, dependente de heróis.</div>
-              <div style="padding: 8px; background: #ffeb99; border: var(--border-thin); color:#960;"><strong>[60-79%] Proativo:</strong> Processos básicos, prevenção.</div>
-              <div style="padding: 8px; background: #cce0ff; border: var(--border-thin); color:#049;"><strong>[80-89%] Otimizado:</strong> Medido, alinhado ao negócio.</div>
-              <div style="padding: 8px; background: #ccffeb; border: var(--border-thin); color:#064;"><strong>[90-100%] Estratégico:</strong> Inovador, gera valor.</div>
+              <div style="padding: 10px; background: #ffcccc; border: var(--border-thin); color:#900;"><strong>[0-59%] Reativo:</strong> Caótico, dependente de heróis.</div>
+              <div style="padding: 10px; background: #ffeb99; border: var(--border-thin); color:#960;"><strong>[60-79%] Proativo:</strong> Processos básicos, prevenção.</div>
+              <div style="padding: 10px; background: #cce0ff; border: var(--border-thin); color:#049;"><strong>[80-89%] Otimizado:</strong> Medido, alinhado ao negócio.</div>
+              <div style="padding: 10px; background: #ccffeb; border: var(--border-thin); color:#064;"><strong>[90-100%] Estratégico:</strong> Inovador, gera valor.</div>
             </div>
           </div>
         </div>
@@ -1522,7 +1574,7 @@ def view_assessment(assessment_id: int):
           </div>
         </div>
 
-        <div style="display: flex; gap: 15px; justify-content: flex-end; margin-bottom: 30px; border-top:var(--border-thick); padding-top:20px;">
+        <div class="actions-bottom-flex" style="display: flex; gap: 15px; justify-content: flex-end; margin-bottom: 30px; border-top:var(--border-thick); padding-top:20px;">
           <a class="btn secondary" href="{{ url_for('answer_assessment', assessment_id=assessment.id) }}">revisar_respostas</a>
           <button class="btn" onclick="window.print()">[ imprimir_PDF ]</button>
         </div>
