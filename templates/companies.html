@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>++ Nova_Empresa</h2>
+  {% if has_perm('manage_companies') %}
+  <form method="post" class="grid-form" style="margin-top:20px;">
+    <div class="form-group"><label>Nome / Razão Social</label><input name="name" required></div>
+    <div class="form-group"><label>Setor_Atuação</label><input name="sector"></div>
+    <div class="form-group"><label>Porte_Empresa</label><select name="size"><option>Pequena</option><option>Média</option><option>Grande</option><option>Enterprise</option></select></div>
+    <div class="form-group"><label>Nome_Contato</label><input name="contact_name"></div>
+    <div class="form-group"><label>E-mail_Contato</label><input name="contact_email" type="email"></div>
+    <div style="grid-column: 1 / -1; text-align: right;"><button class="btn accent" type="submit" style="width:100%; max-width:250px;">Registrar</button></div>
+  </form>
+  {% else %}<p class="flash" style="background:var(--p-warn); color:var(--fg);">Seu perfil não tem permissão de escrita.</p>{% endif %}
+</div>
+<div class="card">
+  <h2>Diretório_Empresas</h2>
+  <div class="table-wrap" style="margin-top:20px;">
+    <table>
+      <tr><th>Empresa</th><th>Setor</th><th>Porte</th><th>Contato Principal</th><th>Ações</th></tr>
+      {% for c in rows %}
+      <tr>
+        <td style="font-weight: 700;">{{ c.name }}</td><td>{{ c.sector or '-' }}</td><td style="font-weight: 700;">{{ c.size or '-' }}</td>
+        <td>{% if c.contact_name %}{{ c.contact_name }} <br><span style="font-size:12px;">{{ c.contact_email }}</span>{% else %}-{% endif %}</td>
+        <td>
+          <div class="actions-flex">
+            <a class="btn" href="{{ url_for('new_assessment', company_id=c.id) }}" style="padding: 4px 8px; font-size: 11px; background:var(--p-accent); color:var(--fg);">Avaliar</a>
+            {% if has_perm('manage_companies') %}
+              <a href="{{ url_for('edit_company', company_id=c.id) }}" class="btn secondary" style="padding: 4px 8px; font-size:11px;">Editar</a>
+              <form action="{{ url_for('delete_company', company_id=c.id) }}" method="POST" style="margin:0;" onsubmit="return confirm('Deletar empresa?');"><button type="submit" class="btn" style="padding: 4px 8px; font-size:11px; background:var(--p-danger); color:white;">[X]</button></form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+{% endblock %}

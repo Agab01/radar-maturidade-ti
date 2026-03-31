@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block login_content %}
+<div class="login-card">
+  <div class="login-header">
+    <div class="logo-wrap">
+      <div class="logo-icon">R</div>
+      <h1>RADAR.MATURIDADE</h1>
+    </div>
+    <p class="muted">Acesso restrito. Identifique-se.</p>
+  </div>
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
+  {% endwith %}
+  <form method="post">
+    <div class="form-group"><label>_ID_LOGIN (E-MAIL)</label><input name="email" type="email" placeholder="..." required></div>
+    <div class="form-group"><label>_CHAVE_ACESSO (SENHA)</label><input name="password" type="password" placeholder="••••••••" required></div>
+    <button type="submit">_AUTENTICAR</button>
+  </form>
+</div>
+{% endblock %}
