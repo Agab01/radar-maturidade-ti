@@ -293,6 +293,10 @@ def change_password():
         new_password = request.form.get("new_password")
         confirm_password = request.form.get("confirm_password")
 
+        if new_password == current_password:
+            flash("ERRO: A nova senha deve ser diferente da atual.")
+            return redirect(url_for("change_password"))
+
         if new_password != confirm_password:
             flash("ERRO: As novas senhas não coincidem.")
             return redirect(url_for("change_password"))
