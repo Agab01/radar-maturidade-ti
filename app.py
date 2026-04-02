@@ -287,6 +287,19 @@ def logout():
 # =========================================================
 @app.route("/change-password", methods=["GET", "POST"])
 @require_login
+
+def validar_senha(new_password, current_password, confirm_password):
+    if not( 6 <= len(new_password) <= 30):
+        return "A nova senha deve ter entre 6 e 30 caracteres."
+
+    if new_password == current_password:
+        return "A nova senha deve ser diferente da atual."
+
+    if new_password != confirm_password:
+        return "As novas senhas não coincidem."
+
+    return None
+
 def change_password():
     if request.method == "POST":
         current_password = request.form.get("current_password")
