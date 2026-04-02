@@ -7,7 +7,7 @@
       <div class="logo-icon" style="background: var(--p-warn); color: var(--fg);">?</div>
       <h1>RECUPERAR_CHAVE</h1>
     </div>
-    <p class="muted">Informe seu e-mail para gerar uma senha temporária.</p>
+    <p class="muted">Informe seu e-mail para receber um link de acesso seguro.</p>
   </div>
 
   {% with messages = get_flashed_messages() %}
@@ -23,7 +23,7 @@
       <label>_ID_LOGIN (E-MAIL CADASTRADO)</label>
       <input name="email" type="email" placeholder="..." required>
     </div>
-    <button type="submit" style="background: var(--fg); color: white;">_GERAR_SENHA_TEMPORÁRIA</button>
+    <button type="submit" style="background: var(--fg); color: white;">_ENVIAR_LINK_REDEFINIÇÃO</button>
   </form>
 
   <div style="margin-top: 25px; border-top: 2px solid var(--fg); padding-top: 20px; text-align: center;">

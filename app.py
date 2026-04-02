@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import os
-import random
-import string
+import secrets
+import hashlib
 import smtplib
 import ssl
 from email.message import EmailMessage
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 from typing import Dict, Tuple
 
@@ -38,7 +38,7 @@ ROLE_PERMISSIONS = {
 }
 
 # =========================================================
-# BANCO DE DADOS & FUNÇÕES DE APOIO
+# BANCO DE DADOS
 # =========================================================
 def get_db():
     if "db" not in g:
@@ -75,6 +75,9 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS assessments (id SERIAL PRIMARY KEY, company_id INTEGER NOT NULL REFERENCES companies(id), title TEXT NOT NULL, evaluator_id INTEGER NOT NULL REFERENCES users(id), started_at TEXT NOT NULL, completed_at TEXT, overall_score REAL, maturity_level TEXT);
             CREATE TABLE IF NOT EXISTS responses (id SERIAL PRIMARY KEY, assessment_id INTEGER NOT NULL REFERENCES assessments(id) ON DELETE CASCADE, question_id INTEGER NOT NULL REFERENCES questions(id), score INTEGER NOT NULL, evidence TEXT, action_plan TEXT, note TEXT, created_at TEXT NOT NULL, UNIQUE(assessment_id, question_id));
         """)
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash TEXT;")
+        cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires_at TEXT;")
+
         cur.execute("SELECT id FROM users LIMIT 1")
         if not cur.fetchone():
             admin_email, admin_pass = os.environ.get("ADMIN_EMAIL"), os.environ.get("ADMIN_PASSWORD")
@@ -85,7 +88,7 @@ def init_db() -> None:
     db.close()
 
 # =========================================================
-# AUTENTICAÇÃO E PERMISSÕES
+# AUTENTICAÇÃO E LÓGICA CORE
 # =========================================================
 def require_login(view):
     @wraps(view)
@@ -112,10 +115,7 @@ def require_perm(perm: str):
         return wrapper
     return decorator
 
-# =========================================================
-# LÓGICA DE NEGÓCIO E INFRAESTRUTURA
-# =========================================================
-def enviar_email_recuperacao(destinatario: str, senha_temporaria: str) -> bool:
+def enviar_link_recuperacao(destinatario: str, link_reset: str) -> bool:
     remetente = os.environ.get("SMTP_EMAIL")
     senha_smtp = os.environ.get("SMTP_PASSWORD")
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -126,26 +126,27 @@ def enviar_email_recuperacao(destinatario: str, senha_temporaria: str) -> bool:
         return False
 
     msg = EmailMessage()
-    msg['Subject'] = 'RADAR.TI - Recuperação de Acesso'
+    msg['Subject'] = 'RADAR.TI - Redefinição de Senha'
     msg['From'] = f"RADAR.TI <{remetente}>"
     msg['To'] = destinatario
     
     conteudo_html = f"""
     <html>
     <body style="font-family: monospace; background-color: #fdfdfc; color: #1a1a1a; padding: 20px;">
-        <div style="border: 3px solid #1a1a1a; padding: 20px; max-width: 500px; margin: 0 auto; box-shadow: 5px 5px 0px #1a1a1a;">
+        <div style="border: 3px solid #1a1a1a; padding: 30px; max-width: 500px; margin: 0 auto; box-shadow: 5px 5px 0px #1a1a1a;">
             <h2 style="background-color: #1a1a1a; color: #ccff00; display: inline-block; padding: 5px 10px;">RESET DE CHAVE</h2>
-            <p>Uma solicitação de recuperação de acesso foi processada.</p>
-            <p>Sua nova senha temporária é:</p>
-            <h1 style="font-size: 32px; letter-spacing: 5px; color: #9d4edd;">{senha_temporaria}</h1>
-            <p>Recomendamos que você altere esta chave no seu painel assim que logar.</p>
+            <p>Uma solicitação de redefinição de senha foi feita para sua conta no RADAR.TI.</p>
+            <p>Clique no botão abaixo para criar uma nova chave. Este link expirará em <strong>30 minutos</strong>.</p>
+            <br>
+            <a href="{link_reset}" style="display: inline-block; background: #9d4edd; color: white; padding: 15px 20px; text-decoration: none; font-weight: bold; border: 2px solid #1a1a1a; text-transform: uppercase;">REDEFINIR MINHA CHAVE</a>
+            <br><br>
             <hr style="border: 1px solid #1a1a1a; margin: 20px 0;">
-            <p style="font-size: 12px; color: #666;">Sistema de Governança RADAR.TI</p>
+            <p style="font-size: 11px; color: #666;">Se você não solicitou isso, ignore este e-mail.</p>
         </div>
     </body>
     </html>
     """
-    msg.set_content(f"Sua senha temporária é: {senha_temporaria}")
+    msg.set_content(f"Acesse o link para redefinir sua senha: {link_reset}")
     msg.add_alternative(conteudo_html, subtype='html')
 
     try:
@@ -181,9 +182,8 @@ def compute_assessment(assessment_id: int) -> Dict:
     overall = round((total_weighted / max_weighted) * 100, 2) if max_weighted else 0.0
     return {"overall": overall, "level": maturity_from_score(overall), "segments": segment_scores, "rows": rows}
 
-
 # =========================================================
-# ROTAS PÚBLICAS (LOGIN, CADASTRO E RECUPERAÇÃO)
+# ROTAS PÚBLICAS (LOGIN E RECUPERAÇÃO SEGURA)
 # =========================================================
 @app.route("/")
 def home():
@@ -208,18 +208,14 @@ def register():
         email = request.form["email"].strip().lower()
         password = request.form["password"]
 
-        existing_user = query_db("SELECT id FROM users WHERE email = %s", (email,), one=True)
-        if existing_user:
+        if query_db("SELECT id FROM users WHERE email = %s", (email,), one=True):
             flash("ERRO: Este e-mail já possui um acesso cadastrado.")
             return redirect(url_for("register"))
 
-        execute_db(
-            "INSERT INTO users (name, email, password_hash, role, created_at) VALUES (%s, %s, %s, %s, %s)",
-            (name, email, generate_password_hash(password), "leitor", datetime.now().isoformat(timespec="seconds"))
-        )
-        flash("ACESSO CRIADO COM SUCESSO! Você já pode se autenticar (Perfil: Leitor).")
+        execute_db("INSERT INTO users (name, email, password_hash, role, created_at) VALUES (%s, %s, %s, %s, %s)",
+                   (name, email, generate_password_hash(password), "leitor", datetime.now().isoformat(timespec="seconds")))
+        flash("ACESSO CRIADO! Autentique-se para continuar.")
         return redirect(url_for("login"))
-    
     return render_template("register.html", is_login=True, title="CADASTRAR / RADAR.TI")
 
 @app.route("/recover", methods=["GET", "POST"])
@@ -229,18 +225,55 @@ def recover():
         user = query_db("SELECT * FROM users WHERE email = %s", (email,), one=True)
 
         if user:
-            temp_pass = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-            if enviar_email_recuperacao(email, temp_pass):
-                execute_db("UPDATE users SET password_hash = %s WHERE id = %s", (generate_password_hash(temp_pass), user["id"]))
-            else:
-                flash("ERRO INTERNO: Falha na comunicação com o servidor de e-mail.")
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+            expires_at = (datetime.now() + timedelta(minutes=30)).isoformat(timespec="seconds")
+            
+            execute_db("UPDATE users SET reset_token_hash = %s, reset_token_expires_at = %s WHERE id = %s",
+                       (token_hash, expires_at, user["id"]))
+            
+            link_reset = url_for("reset", _external=True, email=email, token=raw_token)
+            if not enviar_link_recuperacao(email, link_reset):
+                flash("ERRO: Falha na comunicação com o servidor de e-mail.")
                 return redirect(url_for("recover"))
 
-        # Mensagem genérica para prevenir enumeração de usuários
-        flash("Se o e-mail constar em nossa base, as instruções de recuperação foram enviadas para a sua caixa de entrada.")
+        flash("Se o e-mail constar em nossa base, um link de redefinição seguro foi enviado.")
         return redirect(url_for("login"))
 
     return render_template("recover.html", is_login=True, title="RECUPERAR / RADAR.TI")
+
+@app.route("/reset", methods=["GET", "POST"])
+def reset():
+    email = request.args.get("email", "").strip().lower()
+    token = request.args.get("token", "")
+
+    if not email or not token:
+        flash("Link de redefinição inválido ou incompleto.")
+        return redirect(url_for("login"))
+
+    if request.method == "POST":
+        new_password = request.form.get("password")
+        user = query_db("SELECT * FROM users WHERE email = %s", (email,), one=True)
+
+        if user and user.get("reset_token_hash") and user.get("reset_token_expires_at"):
+            if datetime.now().isoformat() > user["reset_token_expires_at"]:
+                flash("Este link de redefinição já expirou. Solicite um novo.")
+                return redirect(url_for("recover"))
+
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            if secrets.compare_digest(token_hash, user["reset_token_hash"]):
+
+                execute_db(
+                    "UPDATE users SET password_hash = %s, reset_token_hash = NULL, reset_token_expires_at = NULL WHERE id = %s",
+                    (generate_password_hash(new_password), user["id"])
+                )
+                flash("Sua chave de acesso foi redefinida com sucesso! Faça o login.")
+                return redirect(url_for("login"))
+
+        flash("Link de redefinição inválido ou já utilizado.")
+        return redirect(url_for("recover"))
+
+    return render_template("reset.html", email=email, token=token, is_login=True, title="NOVA SENHA / RADAR.TI")
 
 @app.route("/logout")
 @require_login
@@ -248,7 +281,6 @@ def logout():
     session.clear()
     flash("Sessão finalizada com segurança.")
     return redirect(url_for("login"))
-
 
 # =========================================================
 # ROTAS PRIVADAS (SISTEMA)
