@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block login_content %}
+<div class="login-card">
+  <div class="login-header">
+    <div class="logo-wrap">
+      <div class="logo-icon" style="background: var(--p-warn); color: var(--fg);">?</div>
+      <h1>RECUPERAR_CHAVE</h1>
+    </div>
+    <p class="muted">Informe seu e-mail para gerar uma senha temporária.</p>
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="post">
+    <div class="form-group">
+      <label>_ID_LOGIN (E-MAIL CADASTRADO)</label>
+      <input name="email" type="email" placeholder="..." required>
+    </div>
+    <button type="submit" style="background: var(--fg); color: white;">_GERAR_SENHA_TEMPORÁRIA</button>
+  </form>
+
+  <div style="margin-top: 25px; border-top: 2px solid var(--fg); padding-top: 20px; text-align: center;">
+    <a href="{{ url_for('login') }}" style="color: var(--fg); font-size: 13px; font-weight: 700; text-decoration: none;">&lt;&lt; CANCELAR_E_VOLTAR</a>
+  </div>
+</div>
+{% endblock %}

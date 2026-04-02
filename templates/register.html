@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block login_content %}
+<div class="login-card">
+  <div class="login-header">
+    <div class="logo-wrap">
+      <div class="logo-icon" style="background: var(--p-primary); color: white;">+</div>
+      <h1>NOVO_ACESSO</h1>
+    </div>
+    <p class="muted">Preencha os dados para registrar-se.</p>
+  </div>
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <form method="post">
+    <div class="form-group">
+      <label>_NOME_COMPLETO</label>
+      <input name="name" type="text" placeholder="..." required>
+    </div>
+    <div class="form-group">
+      <label>_ID_LOGIN (E-MAIL)</label>
+      <input name="email" type="email" placeholder="..." required>
+    </div>
+    <div class="form-group">
+      <label>_CRIAR_CHAVE (SENHA)</label>
+      <input name="password" type="password" placeholder="••••••••" required minlength="6">
+    </div>
+    <button type="submit" class="accent" style="background: var(--p-accent); color: var(--fg);">_REGISTRAR</button>
+  </form>
+
+  <div style="margin-top: 25px; border-top: 2px solid var(--fg); padding-top: 20px; text-align: center;">
+    <a href="{{ url_for('login') }}" style="color: var(--fg); font-size: 13px; font-weight: 700; text-decoration: none;">&lt;&lt; VOLTAR_PARA_LOGIN</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,8 +1,15 @@
 from __future__ import annotations
+
 import os
+import random
+import string
+import smtplib
+import ssl
+from email.message import EmailMessage
 from datetime import datetime
 from functools import wraps
 from typing import Dict, Tuple
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import Flask, flash, g, redirect, render_template, request, session, url_for
@@ -30,6 +37,9 @@ ROLE_PERMISSIONS = {
     "leitor": {"view_reports"},
 }
 
+# =========================================================
+# BANCO DE DADOS & FUNÇÕES DE APOIO
+# =========================================================
 def get_db():
     if "db" not in g:
         g.db = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
@@ -74,6 +84,9 @@ def init_db() -> None:
                             ("Administrador", admin_email, generate_password_hash(admin_pass), "admin", now))
     db.close()
 
+# =========================================================
+# AUTENTICAÇÃO E PERMISSÕES
+# =========================================================
 def require_login(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
@@ -98,6 +111,52 @@ def require_perm(perm: str):
             return view(*args, **kwargs)
         return wrapper
     return decorator
+
+# =========================================================
+# LÓGICA DE NEGÓCIO E INFRAESTRUTURA
+# =========================================================
+def enviar_email_recuperacao(destinatario: str, senha_temporaria: str) -> bool:
+    remetente = os.environ.get("SMTP_EMAIL")
+    senha_smtp = os.environ.get("SMTP_PASSWORD")
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.environ.get("SMTP_PORT", 465))
+    
+    if not remetente or not senha_smtp:
+        print("Aviso: Credenciais SMTP não configuradas.")
+        return False
+
+    msg = EmailMessage()
+    msg['Subject'] = 'RADAR.TI - Recuperação de Acesso'
+    msg['From'] = f"RADAR.TI <{remetente}>"
+    msg['To'] = destinatario
+    
+    conteudo_html = f"""
+    <html>
+    <body style="font-family: monospace; background-color: #fdfdfc; color: #1a1a1a; padding: 20px;">
+        <div style="border: 3px solid #1a1a1a; padding: 20px; max-width: 500px; margin: 0 auto; box-shadow: 5px 5px 0px #1a1a1a;">
+            <h2 style="background-color: #1a1a1a; color: #ccff00; display: inline-block; padding: 5px 10px;">RESET DE CHAVE</h2>
+            <p>Uma solicitação de recuperação de acesso foi processada.</p>
+            <p>Sua nova senha temporária é:</p>
+            <h1 style="font-size: 32px; letter-spacing: 5px; color: #9d4edd;">{senha_temporaria}</h1>
+            <p>Recomendamos que você altere esta chave no seu painel assim que logar.</p>
+            <hr style="border: 1px solid #1a1a1a; margin: 20px 0;">
+            <p style="font-size: 12px; color: #666;">Sistema de Governança RADAR.TI</p>
+        </div>
+    </body>
+    </html>
+    """
+    msg.set_content(f"Sua senha temporária é: {senha_temporaria}")
+    msg.add_alternative(conteudo_html, subtype='html')
+
+    try:
+        contexto = ssl.create_default_context()
+        with smtplib.SMTP_SSL(smtp_server, smtp_port, context=contexto) as server:
+            server.login(remetente, senha_smtp)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Erro ao enviar e-mail (SMTP): {e}")
+        return False
 
 def maturity_from_score(score: float) -> Tuple[str, str, str]:
     if score < 60: return ("Artesanal / Reativo", "p-artesanal", "Predomínio de ações reativas, pouca padronização e processos manuais.")
@@ -124,7 +183,7 @@ def compute_assessment(assessment_id: int) -> Dict:
 
 
 # =========================================================
-# ROTAS PRINCIPAIS
+# ROTAS PÚBLICAS (LOGIN, CADASTRO E RECUPERAÇÃO)
 # =========================================================
 @app.route("/")
 def home():
@@ -142,6 +201,47 @@ def login():
         flash("Acesso Negado. Credenciais Incorretas.")
     return render_template("login.html", is_login=True, title="LOGIN / RADAR.TI")
 
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        name = request.form["name"].strip()
+        email = request.form["email"].strip().lower()
+        password = request.form["password"]
+
+        existing_user = query_db("SELECT id FROM users WHERE email = %s", (email,), one=True)
+        if existing_user:
+            flash("ERRO: Este e-mail já possui um acesso cadastrado.")
+            return redirect(url_for("register"))
+
+        execute_db(
+            "INSERT INTO users (name, email, password_hash, role, created_at) VALUES (%s, %s, %s, %s, %s)",
+            (name, email, generate_password_hash(password), "leitor", datetime.now().isoformat(timespec="seconds"))
+        )
+        flash("ACESSO CRIADO COM SUCESSO! Você já pode se autenticar (Perfil: Leitor).")
+        return redirect(url_for("login"))
+    
+    return render_template("register.html", is_login=True, title="CADASTRAR / RADAR.TI")
+
+@app.route("/recover", methods=["GET", "POST"])
+def recover():
+    if request.method == "POST":
+        email = request.form["email"].strip().lower()
+        user = query_db("SELECT * FROM users WHERE email = %s", (email,), one=True)
+
+        if user:
+            temp_pass = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            if enviar_email_recuperacao(email, temp_pass):
+                execute_db("UPDATE users SET password_hash = %s WHERE id = %s", (generate_password_hash(temp_pass), user["id"]))
+            else:
+                flash("ERRO INTERNO: Falha na comunicação com o servidor de e-mail.")
+                return redirect(url_for("recover"))
+
+        # Mensagem genérica para prevenir enumeração de usuários
+        flash("Se o e-mail constar em nossa base, as instruções de recuperação foram enviadas para a sua caixa de entrada.")
+        return redirect(url_for("login"))
+
+    return render_template("recover.html", is_login=True, title="RECUPERAR / RADAR.TI")
+
 @app.route("/logout")
 @require_login
 def logout():
@@ -149,6 +249,10 @@ def logout():
     flash("Sessão finalizada com segurança.")
     return redirect(url_for("login"))
 
+
+# =========================================================
+# ROTAS PRIVADAS (SISTEMA)
+# =========================================================
 @app.route("/dashboard")
 @require_login
 def dashboard():
@@ -161,10 +265,6 @@ def dashboard():
     recent = query_db("SELECT a.id, a.title, c.name company_name, a.overall_score, a.maturity_level, a.completed_at FROM assessments a JOIN companies c ON c.id = a.company_id ORDER BY a.id DESC LIMIT 5")
     return render_template("dashboard.html", totals=totals, recent=recent, title="Dashboard_Principal")
 
-
-# =========================================================
-# ROTAS CRUD: USUÁRIOS
-# =========================================================
 @app.route("/users", methods=["GET", "POST"])
 @require_login
 @require_perm("manage_users")
@@ -207,10 +307,6 @@ def delete_user(user_id):
         flash("ERRO: Não é possível deletar um usuário que já realizou avaliações.")
     return redirect(url_for("users"))
 
-
-# =========================================================
-# ROTAS CRUD: EMPRESAS
-# =========================================================
 @app.route("/companies", methods=["GET", "POST"])
 @require_login
 def companies():
@@ -251,10 +347,6 @@ def delete_company(company_id):
         flash("ERRO: Não é possível deletar empresa com relatórios vinculados.")
     return redirect(url_for("companies"))
 
-
-# =========================================================
-# ROTAS CRUD: QUESTÕES
-# =========================================================
 @app.route("/questions", methods=["GET", "POST"])
 @require_login
 def questions():
@@ -295,10 +387,6 @@ def delete_question(question_id):
         flash("ERRO: Quesito não pode ser deletado pois já foi respondido.")
     return redirect(url_for("questions"))
 
-
-# =========================================================
-# ROTAS CRUD: AVALIAÇÕES
-# =========================================================
 @app.route("/assessments")
 @require_login
 def assessments():

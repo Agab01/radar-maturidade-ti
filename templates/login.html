@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+
 {% block login_content %}
 <div class="login-card">
   <div class="login-header">
@@ -8,13 +9,30 @@
     </div>
     <p class="muted">Acesso restrito. Identifique-se.</p>
   </div>
+
   {% with messages = get_flashed_messages() %}
-    {% if messages %}{% for message in messages %}<div class="alert">{{ message }}</div>{% endfor %}{% endif %}
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
   {% endwith %}
+
   <form method="post">
-    <div class="form-group"><label>_ID_LOGIN (E-MAIL)</label><input name="email" type="email" placeholder="..." required></div>
-    <div class="form-group"><label>_CHAVE_ACESSO (SENHA)</label><input name="password" type="password" placeholder="••••••••" required></div>
+    <div class="form-group">
+      <label>_ID_LOGIN (E-MAIL)</label>
+      <input name="email" type="email" placeholder="..." required>
+    </div>
+    <div class="form-group">
+      <label>_CHAVE_ACESSO (SENHA)</label>
+      <input name="password" type="password" placeholder="••••••••" required>
+    </div>
     <button type="submit">_AUTENTICAR</button>
   </form>
+
+  <div style="margin-top: 25px; border-top: 2px solid var(--fg); padding-top: 20px; display: flex; flex-direction: column; gap: 12px; text-align: center;">
+    <a href="{{ url_for('recover') }}" style="color: var(--fg); font-size: 13px; font-weight: 700; text-decoration: none;">[ ESQUECI_MINHA_CHAVE ]</a>
+    <a href="{{ url_for('register') }}" style="color: var(--fg); font-size: 13px; font-weight: 700; text-decoration: none;">[ SOLICITAR_NOVO_ACESSO ]</a>
+  </div>
 </div>
 {% endblock %}
