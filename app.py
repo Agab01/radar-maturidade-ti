@@ -285,6 +285,35 @@ def logout():
 # =========================================================
 # ROTAS PRIVADAS (SISTEMA)
 # =========================================================
+@app.route("/change-password", methods=["GET", "POST"])
+@require_login
+def change_password():
+    if request.method == "POST":
+        current_password = request.form.get("current_password")
+        new_password = request.form.get("new_password")
+        confirm_password = request.form.get("confirm_password")
+
+        if new_password != confirm_password:
+            flash("ERRO: As novas senhas não coincidem.")
+            return redirect(url_for("change_password"))
+
+        user_id = session.get("user_id")
+        user = query_db("SELECT password_hash FROM users WHERE id = %s", (user_id,), one=True)
+
+        if not check_password_hash(user["password_hash"], current_password):
+            flash("ERRO: A chave atual informada está incorreta.")
+            return redirect(url_for("change_password"))
+
+        execute_db(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (generate_password_hash(new_password), user_id)
+        )
+        
+        flash("CHAVE ATUALIZADA COM SUCESSO! Sua nova senha já está ativa.")
+        return redirect(url_for("dashboard"))
+
+    return render_template("change_password.html", title="Alterar Senha / RADAR.TI")
+
 @app.route("/dashboard")
 @require_login
 def dashboard():

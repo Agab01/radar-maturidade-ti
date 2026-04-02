@@ -28,7 +28,8 @@
     </div>
     <div class="user-info">
       <strong>{{ session.get('user_name') }}</strong><br>
-      <span class="muted" style="font-size:12px;">Perfil: {{ session.get('role')|upper }}</span>
+      <span class="muted" style="font-size:12px;">Perfil: {{ session.get('role')|upper }}</span><br>
+      <a href="{{ url_for('change_password') }}" style="font-size: 11px; color: var(--p-primary-dk); text-decoration: none; font-weight: 700; display: inline-block; margin-top: 5px;">[ ALTERAR_SENHA ]</a>
     </div>
   </header>
 
