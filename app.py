@@ -211,7 +211,7 @@ def register():
         if not (6 <= len(password) <= 30):
             flash("ERRO: A senha deve conter entre 6 e 30 caracteres.")
             return redirect(url_for("register"))
-        
+
         if query_db("SELECT id FROM users WHERE email = %s", (email,), one=True):
             flash("ERRO: Este e-mail já possui um acesso cadastrado.")
             return redirect(url_for("register"))
@@ -220,6 +220,7 @@ def register():
                    (name, email, generate_password_hash(password), "leitor", datetime.now().isoformat(timespec="seconds")))
         flash("ACESSO CRIADO! Autentique-se para continuar.")
         return redirect(url_for("login"))
+    
     return render_template("register.html", is_login=True, title="CADASTRAR / RADAR.TI")
 
 @app.route("/recover", methods=["GET", "POST"])
@@ -232,10 +233,6 @@ def recover():
             raw_token = secrets.token_urlsafe(32)
             token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
             expires_at = (datetime.now() + timedelta(minutes=30)).isoformat(timespec="seconds")
-            
-            if not (6 <= len(new_password) <= 30):
-                flash("ERRO: A nova senha deve conter entre 6 e 30 caracteres.")
-                return redirect(url_for("reset", email=email, token=token))
             
             execute_db("UPDATE users SET reset_token_hash = %s, reset_token_expires_at = %s WHERE id = %s",
                        (token_hash, expires_at, user["id"]))
@@ -261,6 +258,11 @@ def reset():
 
     if request.method == "POST":
         new_password = request.form.get("password")
+        
+        if not (6 <= len(new_password) <= 30):
+            flash("ERRO: A nova senha deve conter entre 6 e 30 caracteres.")
+            return redirect(url_for("reset", email=email, token=token))
+
         user = query_db("SELECT * FROM users WHERE email = %s", (email,), one=True)
 
         if user and user.get("reset_token_hash") and user.get("reset_token_expires_at"):
