@@ -393,12 +393,16 @@ def companies():
         if not has_perm("manage_companies"):
             flash("Permissão Negada para Cadastro.")
             return redirect(url_for("companies"))
-        execute_db("INSERT INTO companies (name, sector, size, contact_name, contact_email, created_at) VALUES (%s, %s, %s, %s, %s, %s)",
-                   (request.form["name"], request.form.get("sector"), request.form.get("size"), request.form.get("contact_name"), request.form.get("contact_email"), datetime.now().isoformat(timespec="seconds")))
-        flash("Empresa Cliente Registrada.")
+            
+        execute_db("INSERT INTO companies (name, sector, size, contact_name, contact_email, created_at, auditor_id) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                   (request.form["name"], request.form.get("sector"), request.form.get("size"), request.form.get("contact_name"), request.form.get("contact_email"), datetime.now().isoformat(timespec="seconds"), session.get("user_id")))
+        flash("Empresa Cliente Registrada na sua carteira.")
         return redirect(url_for("companies"))
-    rows = query_db("SELECT * FROM companies ORDER BY id DESC")
-    return render_template("companies.html", rows=rows, title="Diretório_Empresas")
+        
+    if session.get("role") == "admin":
+        rows = query_db("SELECT * FROM companies ORDER BY id DESC")
+    else:
+        rows = query_db("SELECT * FROM companies WHERE auditor_id = %s ORDER BY id DESC", (session.get("user_id"),))
 
 @app.route("/companies/<int:company_id>/edit", methods=["GET", "POST"])
 @require_login
@@ -408,6 +412,11 @@ def edit_company(company_id):
     if not company:
         flash("Empresa não localizada.")
         return redirect(url_for("companies"))
+    
+    if session.get("role") != "admin" and company.get("auditor_id") != session.get("user_id"):
+        flash("ACESSO NEGADO: Esta empresa pertence à carteira de outro auditor.")
+        return redirect(url_for("companies"))
+
     if request.method == "POST":
         execute_db("UPDATE companies SET name=%s, sector=%s, size=%s, contact_name=%s, contact_email=%s WHERE id=%s",
                    (request.form["name"], request.form.get("sector"), request.form.get("size"), request.form.get("contact_name"), request.form.get("contact_email"), company_id))
@@ -469,6 +478,10 @@ def delete_question(question_id):
 @app.route("/assessments")
 @require_login
 def assessments():
+    if session.get("role") == "admin":
+        rows = query_db("SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id ORDER BY a.id DESC")
+    else:
+        rows = query_db("SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id WHERE c.auditor_id = %s ORDER BY a.id DESC", (session.get("user_id"),))
     rows = query_db("SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id ORDER BY a.id DESC")
     return render_template("assessments.html", rows=rows, title="Gestão_Avaliações")
 
@@ -485,11 +498,16 @@ def delete_assessment(assessment_id):
 @require_login
 @require_perm("respond")
 def new_assessment():
-    companies = query_db("SELECT id, name FROM companies ORDER BY name")
+    if session.get("role") == "admin":
+        companies = query_db("SELECT id, name FROM companies ORDER BY name")
+    else:
+        companies = query_db("SELECT id, name FROM companies WHERE auditor_id = %s ORDER BY name", (session.get("user_id"),))
+        
     if request.method == "POST":
         assessment_id = execute_db("INSERT INTO assessments (company_id, title, evaluator_id, started_at) VALUES (%s, %s, %s, %s) RETURNING id",
                                    (request.form["company_id"], request.form["title"], session["user_id"], datetime.now().isoformat(timespec="seconds")))
         return redirect(url_for("answer_assessment", assessment_id=assessment_id))
+        
     return render_template("new_assessment.html", companies=companies, pre_company=request.args.get("company_id", ""), title="Nova_Avaliação")
 
 @app.route("/assessments/<int:assessment_id>/answer", methods=["GET", "POST"])
