@@ -32,9 +32,9 @@ SCORING = {0: "Não se aplica", 1: "Inexistente", 2: "Inicial", 3: "Parcial", 4:
 CATEGORIES = ["Processos de TI", "Ferramentas de TI", "Nível de Serviço", "Alinhamento Estratégico", "Governança de TI", "Gestão de Riscos", "Cultura de TI"]
 ROLE_PERMISSIONS = {
     "admin": {"manage_users", "manage_companies", "manage_questions", "respond", "view_reports"},
-    "analista": {"manage_companies", "manage_questions", "respond", "view_reports"},
+    "analista": {"manage_companies", "manage_questions", "view_reports"},
     "avaliador": {"respond", "view_reports"},
-    "leitor": {"view_reports"},
+    "leitor": {"manage_companies", "view_reports"},
 }
 
 # =========================================================
@@ -335,13 +335,44 @@ def change_password():
 @app.route("/dashboard")
 @require_login
 def dashboard():
-    totals = {
-        "users": query_db("SELECT COUNT(*) c FROM users", one=True)["c"],
-        "companies": query_db("SELECT COUNT(*) c FROM companies", one=True)["c"],
-        "questions": query_db("SELECT COUNT(*) c FROM questions", one=True)["c"],
-        "assessments": query_db("SELECT COUNT(*) c FROM assessments", one=True)["c"],
-    }
-    recent = query_db("SELECT a.id, a.title, c.name company_name, a.overall_score, a.maturity_level, a.completed_at FROM assessments a JOIN companies c ON c.id = a.company_id ORDER BY a.id DESC LIMIT 5")
+    u_id = session.get("user_id")
+    role = session.get("role")
+
+    if role in ["admin", "analista"]:
+        totals = {
+            "users": query_db("SELECT COUNT(*) c FROM users", one=True)["c"],
+            "companies": query_db("SELECT COUNT(*) c FROM companies", one=True)["c"],
+            "questions": query_db("SELECT COUNT(*) c FROM questions", one=True)["c"],
+            "assessments": query_db("SELECT COUNT(*) c FROM assessments", one=True)["c"],
+        }
+        recent = query_db("SELECT a.id, a.title, c.name company_name, a.overall_score, a.maturity_level, a.completed_at FROM assessments a JOIN companies c ON c.id = a.company_id ORDER BY a.id DESC LIMIT 5")
+        
+    elif role == "avaliador":
+        totals = {
+            "users": 1, 
+            "companies": query_db("SELECT COUNT(*) c FROM companies", one=True)["c"],
+            "questions": query_db("SELECT COUNT(*) c FROM questions", one=True)["c"],
+            "assessments": query_db("SELECT COUNT(*) c FROM assessments WHERE evaluator_id = %s", (u_id,), one=True)["c"],
+        }
+        recent = query_db("""
+            SELECT a.id, a.title, c.name company_name, a.overall_score, a.maturity_level, a.completed_at 
+            FROM assessments a JOIN companies c ON c.id = a.company_id 
+            WHERE a.evaluator_id = %s ORDER BY a.id DESC LIMIT 5
+        """, (u_id,))
+        
+    else: 
+        totals = {
+            "users": 1,
+            "companies": query_db("SELECT COUNT(*) c FROM companies WHERE auditor_id = %s", (u_id,), one=True)["c"],
+            "questions": 0, 
+            "assessments": query_db("SELECT COUNT(a.*) c FROM assessments a JOIN companies c ON c.id = a.company_id WHERE c.auditor_id = %s", (u_id,), one=True)["c"],
+        }
+        recent = query_db("""
+            SELECT a.id, a.title, c.name company_name, a.overall_score, a.maturity_level, a.completed_at 
+            FROM assessments a JOIN companies c ON c.id = a.company_id 
+            WHERE c.auditor_id = %s ORDER BY a.id DESC LIMIT 5
+        """, (u_id,))
+
     return render_template("dashboard.html", totals=totals, recent=recent, title="Dashboard_Principal")
 
 @app.route("/users", methods=["GET", "POST"])
@@ -389,20 +420,29 @@ def delete_user(user_id):
 @app.route("/companies", methods=["GET", "POST"])
 @require_login
 def companies():
+    u_id = session.get("user_id")
+    role = session.get("role")
+
     if request.method == "POST":
         if not has_perm("manage_companies"):
-            flash("Permissão Negada para Cadastro.")
+            flash("Permissão Negada.")
             return redirect(url_for("companies"))
             
-        execute_db("INSERT INTO companies (name, sector, size, contact_name, contact_email, created_at, auditor_id) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                   (request.form["name"], request.form.get("sector"), request.form.get("size"), request.form.get("contact_name"), request.form.get("contact_email"), datetime.now().isoformat(timespec="seconds"), session.get("user_id")))
-        flash("Empresa Cliente Registrada na sua carteira.")
+        execute_db("""
+            INSERT INTO companies (name, sector, size, contact_name, contact_email, created_at, auditor_id) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (request.form["name"], request.form.get("sector"), request.form.get("size"), 
+              request.form.get("contact_name"), request.form.get("contact_email"), 
+              datetime.now().isoformat(timespec="seconds"), u_id))
+        flash("Empresa registrada com sucesso.")
         return redirect(url_for("companies"))
-        
-    if session.get("role") == "admin":
+    
+    if role in ["admin", "analista", "avaliador"]:
         rows = query_db("SELECT * FROM companies ORDER BY id DESC")
     else:
-        rows = query_db("SELECT * FROM companies WHERE auditor_id = %s ORDER BY id DESC", (session.get("user_id"),))
+        rows = query_db("SELECT * FROM companies WHERE auditor_id = %s ORDER BY id DESC", (u_id,))
+    
+    return render_template("companies.html", rows=rows, title="Diretório_Empresas")
 
 @app.route("/companies/<int:company_id>/edit", methods=["GET", "POST"])
 @require_login
@@ -478,12 +518,17 @@ def delete_question(question_id):
 @app.route("/assessments")
 @require_login
 def assessments():
-    if session.get("role") == "admin":
-        rows = query_db("SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id ORDER BY a.id DESC")
+    u_id = session.get("user_id")
+    role = session.get("role")
+    
+    if role in ["admin", "analista"]:
+        rows = query_db("""SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id ORDER BY a.id DESC""")
+    elif role == "avaliador":
+        rows = query_db("""SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id WHERE a.evaluator_id = %s ORDER BY a.id DESC""", (u_id,))
     else:
-        rows = query_db("SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id WHERE c.auditor_id = %s ORDER BY a.id DESC", (session.get("user_id"),))
-    rows = query_db("SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id ORDER BY a.id DESC")
-    return render_template("assessments.html", rows=rows, title="Gestão_Avaliações")
+        rows = query_db("""SELECT a.*, c.name company_name, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id WHERE c.auditor_id = %s ORDER BY a.id DESC""", (u_id,))
+        
+    return render_template("assessments.html", rows=rows, title="Relatórios")
 
 @app.route("/assessments/<int:assessment_id>/delete", methods=["POST"])
 @require_login
@@ -498,16 +543,13 @@ def delete_assessment(assessment_id):
 @require_login
 @require_perm("respond")
 def new_assessment():
-    if session.get("role") == "admin":
-        companies = query_db("SELECT id, name FROM companies ORDER BY name")
-    else:
-        companies = query_db("SELECT id, name FROM companies WHERE auditor_id = %s ORDER BY name", (session.get("user_id"),))
-        
+    # O Avaliador e Admin precisam ver todas as empresas na lista para escolher qual vão auditar
+    companies = query_db("SELECT id, name FROM companies ORDER BY name")
+    
     if request.method == "POST":
         assessment_id = execute_db("INSERT INTO assessments (company_id, title, evaluator_id, started_at) VALUES (%s, %s, %s, %s) RETURNING id",
                                    (request.form["company_id"], request.form["title"], session["user_id"], datetime.now().isoformat(timespec="seconds")))
         return redirect(url_for("answer_assessment", assessment_id=assessment_id))
-        
     return render_template("new_assessment.html", companies=companies, pre_company=request.args.get("company_id", ""), title="Nova_Avaliação")
 
 @app.route("/assessments/<int:assessment_id>/answer", methods=["GET", "POST"])
