@@ -428,15 +428,23 @@ def companies():
             flash("Permissão Negada.")
             return redirect(url_for("companies"))
             
+        company_name = request.form["name"].strip()
+
+        existing_company = query_db("SELECT id FROM companies WHERE lower(name) = %s AND auditor_id = %s", (company_name.lower(), u_id), one=True)
+        
+        if existing_company:
+            flash(f"ERRO: A empresa '{company_name}' já está cadastrada na sua conta.")
+            return redirect(url_for("companies"))
+            
         execute_db("""
             INSERT INTO companies (name, sector, size, contact_name, contact_email, created_at, auditor_id) 
             VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (request.form["name"], request.form.get("sector"), request.form.get("size"), 
+        """, (company_name, request.form.get("sector"), request.form.get("size"), 
               request.form.get("contact_name"), request.form.get("contact_email"), 
               datetime.now().isoformat(timespec="seconds"), u_id))
         flash("Empresa registrada com sucesso.")
         return redirect(url_for("companies"))
-    
+
     if role in ["admin", "analista", "avaliador"]:
         rows = query_db("SELECT * FROM companies ORDER BY id DESC")
     else:
