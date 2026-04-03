@@ -1,66 +1,80 @@
 <!doctype html>
 <html lang="pt-br">
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
   <title>{{ title or 'RADAR.TI' }}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-  
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  
+
   <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
   <script defer src="/_vercel/insights/script.js"></script>
   <script>window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };</script>
   <script defer src="/_vercel/speed-insights/script.js"></script>
 </head>
+
 <body class="{% if is_login %}login-body{% endif %}">
 
-{% if not is_login %}
-<div class="app-wrap">
-  {% if session.get('user_id') %}
-  <header class="main-header">
-    <div class="brand">
-      <div class="brand-logo">R</div>
-      <div>
-        <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted);">Radar_Governança</div>
-        <h1 style="font-size:24px; margin:0;">Maturidade.TI</h1>
+  {% if not is_login %}
+  <div class="app-wrap">
+    {% if session.get('user_id') %}
+    <header class="main-header">
+      <div class="brand">
+        <div class="brand-logo">R</div>
+        <div>
+          <div style="font-size:11px; text-transform:uppercase; color:var(--text-muted);">Radar_Governança</div>
+          <h1 style="font-size:24px; margin:0;">Maturidade.TI</h1>
+        </div>
       </div>
-    </div>
-    <div class="user-info">
-      <strong>{{ session.get('user_name') }}</strong><br>
-      <span class="muted" style="font-size:12px;">Perfil: {{ session.get('role')|upper }}</span><br>
-      <a href="{{ url_for('change_password') }}" style="font-size: 11px; color: var(--p-primary-dk); text-decoration: none; font-weight: 700; display: inline-block; margin-top: 5px;">[ ALTERAR_SENHA ]</a>
-    </div>
-  </header>
+      <div class="user-info">
+        <strong>{{ session.get('user_name') }}</strong><br>
+        <span class="muted" style="font-size:12px;">Perfil: {{ session.get('role')|upper }}</span><br>
+        <a href="{{ url_for('change_password') }}"
+          style="font-size: 11px; color: var(--p-primary-dk); text-decoration: none; font-weight: 700; display: inline-block; margin-top: 5px;">[
+          ALTERAR_SENHA ]</a>
+      </div>
+    </header>
 
-  <nav class="main-nav">
-    <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">DASHBOARD</a>
-    <a href="{{ url_for('companies') }}" class="{% if request.endpoint in ['companies', 'edit_company'] %}active{% endif %}">EMPRESAS</a>
-    <a href="{{ url_for('questions') }}" class="{% if request.endpoint in ['questions', 'edit_question'] %}active{% endif %}">QUESTÕES</a>
-    <a href="{{ url_for('assessments') }}" class="{% if request.endpoint in ['assessments','new_assessment','view_assessment', 'answer_assessment'] %}active{% endif %}">AVALIAÇÕES</a>
-    {% if has_perm('manage_users') %}
-    <a href="{{ url_for('users') }}" class="{% if request.endpoint in ['users', 'edit_user'] %}active{% endif %}">ACESSOS</a>
+    <nav class="main-nav">
+      <a href="{{ url_for('dashboard') }}"
+        class="{% if request.endpoint == 'dashboard' %}active{% endif %}">DASHBOARD</a>
+      <a href="{{ url_for('companies') }}"
+        class="{% if request.endpoint in ['companies', 'edit_company'] %}active{% endif %}">EMPRESAS</a>
+      {% if session.role != 'leitor' %}
+      <a href="{{ url_for('questions') }}"
+        class="{% if request.endpoint in ['questions', 'edit_question'] %}active{% endif %}">QUESTÕES</a>
+      {% endif %}
+      <a href="{{ url_for('assessments') }}"
+        class="{% if request.endpoint in ['assessments','new_assessment','view_assessment', 'answer_assessment'] %}active{% endif %}">AVALIAÇÕES</a>
+      {% if has_perm('manage_users') %}
+      <a href="{{ url_for('users') }}"
+        class="{% if request.endpoint in ['users', 'edit_user'] %}active{% endif %}">ACESSOS</a>
+      {% endif %}
+      <a href="{{ url_for('logout') }}"
+        style="background:var(--p-danger); color:white; border-color:var(--fg);">SAIR</a>
+    </nav>
     {% endif %}
-    <a href="{{ url_for('logout') }}" style="background:var(--p-danger); color:white; border-color:var(--fg);">SAIR</a>
-  </nav>
+
+    <main class="content">
+      {% with messages = get_flashed_messages() %}
+      {% if messages %}
+      {% for message in messages %}
+      <div class="flash">{{ message }}</div>
+      {% endfor %}
+      {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+
+    </main>
+  </div>
+  {% else %}
+  {% block login_content %}{% endblock %}
   {% endif %}
 
-  <main class="content">
-    {% with messages = get_flashed_messages() %}
-      {% if messages %}
-        {% for message in messages %}
-          <div class="flash">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
-    
-    {% block content %}{% endblock %}
-    
-  </main>
-</div>
-{% else %}
-  {% block login_content %}{% endblock %}
-{% endif %}
-
 </body>
+
 </html>

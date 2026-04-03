@@ -11,11 +11,11 @@
   </div>
 
   {% with messages = get_flashed_messages() %}
-    {% if messages %}
-      {% for message in messages %}
-        <div class="alert">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
+  {% if messages %}
+  {% for message in messages %}
+  <div class="alert">{{ message }}</div>
+  {% endfor %}
+  {% endif %}
   {% endwith %}
 
   <form method="post">
@@ -35,7 +35,8 @@
   </form>
 
   <div style="margin-top: 25px; border-top: 2px solid var(--fg); padding-top: 20px; text-align: center;">
-    <a href="{{ url_for('login') }}" style="color: var(--fg); font-size: 13px; font-weight: 700; text-decoration: none;">&lt;&lt; VOLTAR_PARA_LOGIN</a>
+    <a href="{{ url_for('login') }}"
+      style="color: var(--fg); font-size: 13px; font-weight: 700; text-decoration: none;">&lt;&lt; VOLTAR_PARA_LOGIN</a>
   </div>
 </div>
 {% endblock %}

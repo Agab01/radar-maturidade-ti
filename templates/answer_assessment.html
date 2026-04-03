@@ -6,22 +6,36 @@
 </div>
 <form method="post">
   {% for q in questions %}
-    <div class="card" style="margin-bottom:20px; border-color:var(--p-primary);">
-      <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 15px; border-bottom:var(--border-thin); padding-bottom:10px; flex-wrap: wrap; gap:10px;">
-        <span class="pill" style="background:var(--fg); color:white; border:none;">{{ q.category }}</span><strong class="muted">QUESITO {{ loop.index }}</strong>
-      </div>
-      <h2 style="font-family:'Space Mono'; text-transform:none; background:none; color:var(--fg); padding:0; margin-bottom:10px;">{{ q.text }}</h2>
-      {% if q.guidance %}<p style="font-size: 13px; background: var(--bg); padding: 10px; border: var(--border-thin);"><strong>GUIA:</strong> {{ q.guidance }}</p>{% endif %}
-      <div class="grid-form" style="margin-top: 20px;">
-        <div class="form-group"><label>_NOTA (0 a 5)</label><select name="score_{{ q.id }}" style="background: white; border-width: 2px;">{% for v, label in scoring.items() %}<option value="{{ v }}" {% if existing.get(q.id) and existing[q.id]['score'] == v %}selected{% endif %}>{{ v }} - {{ label }}</option>{% endfor %}</select></div>
-        <div class="form-group"><label>_EVIDÊNCIAS_ENCONTRADAS</label><textarea name="evidence_{{ q.id }}" placeholder="...">{{ existing.get(q.id)['evidence'] if existing.get(q.id) else '' }}</textarea></div>
-        <div class="form-group"><label>_PLANO_DE_AÇÃO_RECOMENDADO</label><textarea name="action_{{ q.id }}" placeholder="...">{{ existing.get(q.id)['action_plan'] if existing.get(q.id) else '' }}</textarea></div>
-        <div class="form-group"><label>_NOTAS_INTERNAS (OPCIONAL)</label><textarea name="note_{{ q.id }}" placeholder="...">{{ existing.get(q.id)['note'] if existing.get(q.id) else '' }}</textarea></div>
-      </div>
+  <div class="card" style="margin-bottom:20px; border-color:var(--p-primary);">
+    <div
+      style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 15px; border-bottom:var(--border-thin); padding-bottom:10px; flex-wrap: wrap; gap:10px;">
+      <span class="pill" style="background:var(--fg); color:white; border:none;">{{ q.category }}</span><strong
+        class="muted">QUESITO {{ loop.index }}</strong>
     </div>
+    <h2
+      style="font-family:'Space Mono'; text-transform:none; background:none; color:var(--fg); padding:0; margin-bottom:10px;">
+      {{ q.text }}</h2>
+    {% if q.guidance %}<p style="font-size: 13px; background: var(--bg); padding: 10px; border: var(--border-thin);">
+      <strong>GUIA:</strong> {{ q.guidance }}
+    </p>{% endif %}
+    <div class="grid-form" style="margin-top: 20px;">
+      <div class="form-group"><label>_NOTA (0 a 5)</label><select name="score_{{ q.id }}"
+          style="background: white; border-width: 2px;">{% for v, label in scoring.items() %}<option value="{{ v }}" {%
+            if existing.get(q.id) and existing[q.id]['score']==v %}selected{% endif %}>{{ v }} - {{ label }}</option>{%
+          endfor %}</select></div>
+      <div class="form-group"><label>_EVIDÊNCIAS_ENCONTRADAS</label><textarea name="evidence_{{ q.id }}"
+          placeholder="...">{{ existing.get(q.id)['evidence'] if existing.get(q.id) else '' }}</textarea></div>
+      <div class="form-group"><label>_PLANO_DE_AÇÃO_RECOMENDADO</label><textarea name="action_{{ q.id }}"
+          placeholder="...">{{ existing.get(q.id)['action_plan'] if existing.get(q.id) else '' }}</textarea></div>
+      <div class="form-group"><label>_NOTAS_INTERNAS (OPCIONAL)</label><textarea name="note_{{ q.id }}"
+          placeholder="...">{{ existing.get(q.id)['note'] if existing.get(q.id) else '' }}</textarea></div>
+    </div>
+  </div>
   {% endfor %}
-  <div style="position: sticky; bottom: 0; z-index: 10; padding: 15px; background: var(--surface); border-top: var(--border-thick); border-left: var(--border-thick); border-right: var(--border-thick); box-shadow: 0 -5px 15px rgba(0,0,0,0.1); text-align: center;">
-    <button class="btn accent" type="submit" style="font-size: 16px; padding: 15px 30px; width: 100%; max-width: 400px;">[ FINALIZAR_E_GERAR ]</button>
+  <div
+    style="position: sticky; bottom: 0; z-index: 10; padding: 15px; background: var(--surface); border-top: var(--border-thick); border-left: var(--border-thick); border-right: var(--border-thick); box-shadow: 0 -5px 15px rgba(0,0,0,0.1); text-align: center;">
+    <button class="btn accent" type="submit"
+      style="font-size: 16px; padding: 15px 30px; width: 100%; max-width: 400px;">[ FINALIZAR_E_GERAR ]</button>
   </div>
 </form>
 {% endblock %}

@@ -3,9 +3,14 @@
 <div class="card" style="max-width: 600px; margin: 0 auto;">
   <h2>:: Setup_Nova_Avaliação</h2>
   <form method="post" style="margin-top:20px;">
-    <div class="form-group"><label>Selecione_Empresa</label><select name="company_id" required><option value="">...</option>{% for c in companies %}<option value="{{ c.id }}" {% if pre_company|int == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}</select></div>
-    <div class="form-group"><label>Título_Diagnóstico</label><input name="title" value="Diagnóstico de Maturidade de TI" required></div>
-    <div style="text-align: right; margin-top:20px;"><button class="btn accent" type="submit" style="width: 100%;">Abrir Questionário =></button></div>
+    <div class="form-group"><label>Selecione_Empresa</label><select name="company_id" required>
+        <option value="">...</option>{% for c in companies %}<option value="{{ c.id }}" {% if pre_company|int==c.id
+          %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="form-group"><label>Título_Diagnóstico</label><input name="title" value="Diagnóstico de Maturidade de TI"
+        required></div>
+    <div style="text-align: right; margin-top:20px;"><button class="btn accent" type="submit" style="width: 100%;">Abrir
+        Questionário =></button></div>
   </form>
 </div>
 {% endblock %}

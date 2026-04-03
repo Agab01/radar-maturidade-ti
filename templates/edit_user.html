@@ -3,12 +3,19 @@
 <div class="card" style="max-width: 600px; margin: 0 auto;">
   <h2>:: Editar_Acesso</h2>
   <form method="post" class="grid-form" style="margin-top:20px;">
-    <div class="form-group" style="grid-column: 1 / -1;"><label>Nome_Completo</label><input name="name" value="{{ user.name }}" required></div>
-    <div class="form-group" style="grid-column: 1 / -1;"><label>E-mail_Login</label><input name="email" type="email" value="{{ user.email }}" required></div>
-    <div class="form-group" style="grid-column: 1 / -1;"><label>Nova_Senha (deixe em branco para manter a atual)</label><input name="password" type="password" placeholder="••••••••"></div>
-    <div class="form-group" style="grid-column: 1 / -1;"><label>Perfil_Acesso</label><select name="role">{% for role in roles %}<option value="{{ role }}" {% if user.role == role %}selected{% endif %}>{{ role|upper }}</option>{% endfor %}</select></div>
-    <div class="actions-bottom-flex" style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
-      <a href="{{ url_for('users') }}" class="btn secondary">Cancelar</a><button class="btn accent" type="submit">Salvar_Alterações</button>
+    <div class="form-group" style="grid-column: 1 / -1;"><label>Nome_Completo</label><input name="name"
+        value="{{ user.name }}" required></div>
+    <div class="form-group" style="grid-column: 1 / -1;"><label>E-mail_Login</label><input name="email" type="email"
+        value="{{ user.email }}" required></div>
+    <div class="form-group" style="grid-column: 1 / -1;"><label>Nova_Senha (deixe em branco para manter a
+        atual)</label><input name="password" type="password" placeholder="••••••••"></div>
+    <div class="form-group" style="grid-column: 1 / -1;"><label>Perfil_Acesso</label><select name="role">{% for role in
+        roles %}<option value="{{ role }}" {% if user.role==role %}selected{% endif %}>{{ role|upper }}</option>{%
+        endfor %}</select></div>
+    <div class="actions-bottom-flex"
+      style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
+      <a href="{{ url_for('users') }}" class="btn secondary">Cancelar</a><button class="btn accent"
+        type="submit">Salvar_Alterações</button>
     </div>
   </form>
 </div>

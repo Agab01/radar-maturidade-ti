@@ -1,33 +1,71 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="stat-grid">
-  <div class="stat-card"><strong>[ USUÁRIOS ]</strong><div class="score">{{ totals.users }}</div></div>
-  <div class="stat-card"><strong>[ EMPRESAS ]</strong><div class="score">{{ totals.companies }}</div></div>
-  <div class="stat-card"><strong>[ QUESTÕES ]</strong><div class="score">{{ totals.questions }}</div></div>
-  <div class="stat-card"><strong>[ AVALIAÇÕES ]</strong><div class="score">{{ totals.assessments }}</div></div>
-</div>
-<div class="card">
-  <div class="flex-header-actions" style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
-    <h2>Avaliações_Recentes</h2>
-    <a class="btn accent" href="{{ url_for('new_assessment') }}">++ Nova</a>
+  {% if session.role == 'admin' %}
+  <div class="stat-card"><strong>[ USUÁRIOS ]</strong>
+    <div class="score">{{ totals.users }}</div>
   </div>
+  {% endif %}
+
+  <div class="stat-card"><strong>[ EMPRESAS ]</strong>
+    <div class="score">{{ totals.companies }}</div>
+  </div>
+
+  {% if session.role != 'leitor' %}
+  <div class="stat-card"><strong>[ QUESTÕES ]</strong>
+    <div class="score">{{ totals.questions }}</div>
+  </div>
+  {% endif %}
+
+  <div class="stat-card"><strong>[ AVALIAÇÕES ]</strong>
+    <div class="score">{{ totals.assessments }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="flex-header-actions"
+    style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+    <h2>Avaliações_Recentes</h2>
+
+    {% if has_perm('respond') %}
+    <a class="btn accent" href="{{ url_for('new_assessment') }}">++ Nova</a>
+    {% endif %}
+  </div>
+
   <div class="table-wrap">
     <table>
-      <tr><th>ID</th><th>Título</th><th>Empresa</th><th>Score</th><th>Maturidade</th><th>Ações</th></tr>
+      <tr>
+        <th>ID</th>
+        <th>Título</th>
+        <th>Empresa</th>
+        <th>Score</th>
+        <th>Maturidade</th>
+        <th>Ações</th>
+      </tr>
       {% for r in recent %}
-        <tr>
-          <td>#{{ r.id }}</td><td style="font-weight: 700;">{{ r.title }}</td><td>{{ r.company_name }}</td><td style="font-weight: 700;">{{ '%.1f'|format(r.overall_score or 0) }}%</td>
-          <td><span class="pill p-{{ (r.maturity_level|lower).split()[0] if r.maturity_level else 'default' }}">{{ r.maturity_level or 'PENDENTE' }}</span></td>
-          <td>
-            <div class="actions-flex">
-              <a class="btn secondary" href="{{ url_for('view_assessment', assessment_id=r.id) }}" style="padding: 6px 10px; font-size: 12px;">Relatório</a>
-              {% if has_perm('respond') %}
-              <form action="{{ url_for('delete_assessment', assessment_id=r.id) }}" method="POST" style="margin:0;" onsubmit="return confirm('ATENÇÃO! Deletar esta avaliação?');"><button type="submit" class="btn" style="padding: 6px 10px; font-size:12px; background:var(--p-danger); color:white;">[X]</button></form>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
-      {% else %}<tr><td colspan="6" style="text-align:center; padding: 30px;">[ Base de avaliações vazia ]</td></tr>{% endfor %}
+      <tr>
+        <td>#{{ r.id }}</td>
+        <td style="font-weight: 700;">{{ r.title }}</td>
+        <td>{{ r.company_name }}</td>
+        <td style="font-weight: 700;">{{ '%.1f'|format(r.overall_score or 0) }}%</td>
+        <td><span class="pill p-{{ (r.maturity_level|lower).split()[0] if r.maturity_level else 'default' }}">{{
+            r.maturity_level or 'PENDENTE' }}</span></td>
+        <td>
+          <div class="actions-flex">
+            <a class="btn secondary" href="{{ url_for('view_assessment', assessment_id=r.id) }}"
+              style="padding: 6px 10px; font-size: 12px;">Relatório</a>
+
+            {% if has_perm('respond') %}
+            <form action="{{ url_for('delete_assessment', assessment_id=r.id) }}" method="POST" style="margin:0;"
+              onsubmit="return confirm('ATENÇÃO! Deletar esta avaliação?');"><button type="submit" class="btn"
+                style="padding: 6px 10px; font-size:12px; background:var(--p-danger); color:white;">[X]</button></form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}<tr>
+        <td colspan="6" style="text-align:center; padding: 30px;">[ Base de avaliações vazia ]</td>
+      </tr>{% endfor %}
     </table>
   </div>
 </div>
