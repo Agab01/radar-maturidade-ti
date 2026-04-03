@@ -563,7 +563,9 @@ def new_assessment():
         
         return redirect(url_for("answer_assessment", assessment_id=assessment_id))
         
-    return render_template("new_assessment.html", companies=companies_list, title="Iniciar_Avaliação")
+    pre_company = request.args.get("company_id", 0) 
+  
+    return render_template("new_assessment.html", companies=companies_list, title="Iniciar_Avaliação", pre_company=pre_company)
 
 @app.route("/assessments/<int:assessment_id>/answer", methods=["GET", "POST"])
 @require_login
