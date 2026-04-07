@@ -20,6 +20,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "fallback-inseguro-apenas-para-dev")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=1440)
 app.config["SESSION_COOKIE_SECURE"] = True
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -196,6 +197,7 @@ def login():
         email, password = request.form["email"].strip().lower(), request.form["password"]
         user = query_db("SELECT * FROM users WHERE lower(email) = %s", (email,), one=True)
         if user and check_password_hash(user["password_hash"], password):
+            session.permanent = True
             session["user_id"], session["user_name"], session["role"] = user["id"], user["name"], user["role"]
             return redirect(url_for("dashboard"))
         flash("Acesso Negado. Credenciais Incorretas.")
