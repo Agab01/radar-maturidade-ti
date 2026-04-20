@@ -4,34 +4,151 @@
   <h1 style="color:var(--p-accent);">#Questionário_Avaliação</h1>
   <p style="margin:0;">[ ID_AVALIAÇÃO: {{ assessment.id }} ] | Responda todos os quesitos abaixo.</p>
 </div>
+
 <form method="post">
   {% for q in questions %}
   <div class="card" style="margin-bottom:20px; border-color:var(--p-primary);">
+
     <div
       style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 15px; border-bottom:var(--border-thin); padding-bottom:10px; flex-wrap: wrap; gap:10px;">
-      <span class="pill" style="background:var(--fg); color:white; border:none;">{{ q.category }}</span><strong
-        class="muted">QUESITO {{ loop.index }}</strong>
+      <div style="display:flex; gap:10px;">
+        <span class="pill" style="background:var(--fg); color:white; border:none;">{{ q.category }}</span>
+        {% if q.cid_pillar and q.cid_pillar != 'N/A' %}
+        <span class="pill" style="background:var(--p-danger); color:white; border:none;">{{ q.cid_pillar }}</span>
+        {% endif %}
+      </div>
+      <strong class="muted">QUESITO {{ loop.index }}</strong>
     </div>
+
     <h2
       style="font-family:'Space Mono'; text-transform:none; background:none; color:var(--fg); padding:0; margin-bottom:10px;">
-      {{ q.text }}</h2>
-    {% if q.guidance %}<p style="font-size: 13px; background: var(--bg); padding: 10px; border: var(--border-thin);">
+      {{ q.text }}
+    </h2>
+
+    {% if q.guidance %}
+    <p style="font-size: 13px; background: var(--bg); padding: 10px; border: var(--border-thin);">
       <strong>GUIA:</strong> {{ q.guidance }}
-    </p>{% endif %}
+    </p>
+    {% endif %}
+
     <div class="grid-form" style="margin-top: 20px;">
-      <div class="form-group"><label>_NOTA (0 a 5)</label><select name="score_{{ q.id }}"
-          style="background: white; border-width: 2px;">{% for v, label in scoring.items() %}<option value="{{ v }}" {%
-            if existing.get(q.id) and existing[q.id]['score']==v %}selected{% endif %}>{{ v }} - {{ label }}</option>{%
-          endfor %}</select></div>
-      <div class="form-group"><label>_EVIDÊNCIAS_ENCONTRADAS</label><textarea name="evidence_{{ q.id }}"
-          placeholder="...">{{ existing.get(q.id)['evidence'] if existing.get(q.id) else '' }}</textarea></div>
-      <div class="form-group"><label>_PLANO_DE_AÇÃO_RECOMENDADO</label><textarea name="action_{{ q.id }}"
-          placeholder="...">{{ existing.get(q.id)['action_plan'] if existing.get(q.id) else '' }}</textarea></div>
-      <div class="form-group"><label>_NOTAS_INTERNAS (OPCIONAL)</label><textarea name="note_{{ q.id }}"
-          placeholder="...">{{ existing.get(q.id)['note'] if existing.get(q.id) else '' }}</textarea></div>
+      <div class="form-group">
+        <label>_NOTA (0 a 5)</label>
+        <select name="score_{{ q.id }}" style="background: white; border-width: 2px;">
+          {% for v, label in scoring.items() %}
+          <option value="{{ v }}" {% if existing.get(q.id) and existing[q.id]['score']==v %}selected{% endif %}>
+            {{ v }} - {{ label }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>_EVIDÊNCIAS_ENCONTRADAS</label>
+        <textarea name="evidence_{{ q.id }}"
+          placeholder="...">{{ existing.get(q.id)['evidence'] if existing.get(q.id) else '' }}</textarea>
+      </div>
     </div>
+
+    {% if 'Risco' in q.category or 'Segurança' in q.category %}
+    <div
+      style="background: var(--p-warn); border: var(--border-thin); padding: 15px; margin-top: 15px; color: var(--fg);">
+      <h4 style="margin-top: 0; margin-bottom: 15px;">[ ⚠️ Análise de Risco - Probabilidade x Impacto ]</h4>
+      <div class="grid-form">
+        <div class="form-group">
+          <label style="color:var(--fg);">_PROBABILIDADE (0 a 5)</label>
+          <select name="risk_prob_{{ q.id }}" style="background: white;">
+            <option value="0" {% if existing.get(q.id) and existing[q.id]['risk_probability']==0 %}selected{% endif %}>0
+              - Nenhuma</option>
+            <option value="1" {% if existing.get(q.id) and existing[q.id]['risk_probability']==1 %}selected{% endif %}>1
+              - Rara</option>
+            <option value="2" {% if existing.get(q.id) and existing[q.id]['risk_probability']==2 %}selected{% endif %}>2
+              - Improvável</option>
+            <option value="3" {% if existing.get(q.id) and existing[q.id]['risk_probability']==3 %}selected{% endif %}>3
+              - Possível</option>
+            <option value="4" {% if existing.get(q.id) and existing[q.id]['risk_probability']==4 %}selected{% endif %}>4
+              - Provável</option>
+            <option value="5" {% if existing.get(q.id) and existing[q.id]['risk_probability']==5 %}selected{% endif %}>5
+              - Quase Certa</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label style="color:var(--fg);">_IMPACTO_NO_NEGÓCIO (0 a 5)</label>
+          <select name="risk_impact_{{ q.id }}" style="background: white;">
+            <option value="0" {% if existing.get(q.id) and existing[q.id]['risk_impact']==0 %}selected{% endif %}>0 -
+              Nenhum</option>
+            <option value="1" {% if existing.get(q.id) and existing[q.id]['risk_impact']==1 %}selected{% endif %}>1 -
+              Muito Baixo</option>
+            <option value="2" {% if existing.get(q.id) and existing[q.id]['risk_impact']==2 %}selected{% endif %}>2 -
+              Baixo</option>
+            <option value="3" {% if existing.get(q.id) and existing[q.id]['risk_impact']==3 %}selected{% endif %}>3 -
+              Moderado</option>
+            <option value="4" {% if existing.get(q.id) and existing[q.id]['risk_impact']==4 %}selected{% endif %}>4 -
+              Alto</option>
+            <option value="5" {% if existing.get(q.id) and existing[q.id]['risk_impact']==5 %}selected{% endif %}>5 -
+              Crítico</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="border-top: var(--border-thick); padding-top: 15px; margin-top: 15px;">
+      <h4 style="margin-bottom: 15px;">[ Plano de Ação Estruturado ]</h4>
+      <div class="form-group" style="margin-bottom: 15px;">
+        <label>_AÇÃO_RECOMENDADA</label>
+        <textarea name="action_{{ q.id }}" placeholder="Descreva a ação corretiva..."
+          style="min-height: 60px;">{{ existing.get(q.id)['action_plan'] if existing.get(q.id) else '' }}</textarea>
+      </div>
+
+      <div class="grid-form" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+        <div class="form-group">
+          <label>_RESPONSÁVEL</label>
+          <input type="text" name="action_resp_{{ q.id }}" placeholder="Nome/Setor"
+            value="{{ existing.get(q.id)['action_responsible'] if existing.get(q.id) else '' }}">
+        </div>
+        <div class="form-group">
+          <label>_PRAZO (DEADLINE)</label>
+          <input type="date" name="action_deadline_{{ q.id }}"
+            value="{{ existing.get(q.id)['action_deadline'] if existing.get(q.id) else '' }}">
+        </div>
+        <div class="form-group">
+          <label>_PRIORIDADE</label>
+          <select name="action_priority_{{ q.id }}">
+            <option value="" {% if not existing.get(q.id) or not existing[q.id]['action_priority'] %}selected{% endif
+              %}>-- Selecione --</option>
+            <option value="Baixa" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Baixa' %}selected{%
+              endif %}>Baixa</option>
+            <option value="Média" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Média' %}selected{%
+              endif %}>Média</option>
+            <option value="Alta" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Alta' %}selected{%
+              endif %}>Alta</option>
+            <option value="Crítica" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Crítica'
+              %}selected{% endif %}>Crítica</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>_STATUS</label>
+          <select name="action_status_{{ q.id }}">
+            <option value="A Fazer" {% if not existing.get(q.id) or existing[q.id]['action_status']=='A Fazer'
+              %}selected{% endif %}>A Fazer</option>
+            <option value="Em Andamento" {% if existing.get(q.id) and existing[q.id]['action_status']=='Em Andamento'
+              %}selected{% endif %}>Em Andamento</option>
+            <option value="Concluído" {% if existing.get(q.id) and existing[q.id]['action_status']=='Concluído'
+              %}selected{% endif %}>Concluído</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 15px; border-top: var(--border-thin); padding-top:15px;">
+      <label>_NOTAS_INTERNAS (OPCIONAL)</label>
+      <textarea name="note_{{ q.id }}" placeholder="..."
+        style="min-height: 50px;">{{ existing.get(q.id)['note'] if existing.get(q.id) else '' }}</textarea>
+    </div>
+
   </div>
   {% endfor %}
+
   <div
     style="position: sticky; bottom: 0; z-index: 10; padding: 15px; background: var(--surface); border-top: var(--border-thick); border-left: var(--border-thick); border-right: var(--border-thick); box-shadow: 0 -5px 15px rgba(0,0,0,0.1); text-align: center;">
     <button class="btn accent" type="submit"

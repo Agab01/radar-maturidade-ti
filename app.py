@@ -96,8 +96,14 @@ def init_db() -> None:
         cur.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS cid_pillar TEXT DEFAULT 'N/A';")
         cur.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS gov_or_mgt TEXT DEFAULT 'Gestão (Execução/Operação)';")
         cur.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS framework_ref TEXT DEFAULT 'N/A';")
-
+        cur.execute("ALTER TABLE responses ADD COLUMN IF NOT EXISTS risk_probability INTEGER DEFAULT 0;")
+        cur.execute("ALTER TABLE responses ADD COLUMN IF NOT EXISTS risk_impact INTEGER DEFAULT 0;")
+        cur.execute("ALTER TABLE responses ADD COLUMN IF NOT EXISTS action_responsible TEXT;")
+        cur.execute("ALTER TABLE responses ADD COLUMN IF NOT EXISTS action_deadline TEXT;")
+        cur.execute("ALTER TABLE responses ADD COLUMN IF NOT EXISTS action_priority TEXT;")
+        cur.execute("ALTER TABLE responses ADD COLUMN IF NOT EXISTS action_status TEXT DEFAULT 'A Fazer';")
         cur.execute("SELECT id FROM users LIMIT 1")
+
         if not cur.fetchone():
             admin_email, admin_pass = os.environ.get("ADMIN_EMAIL"), os.environ.get("ADMIN_PASSWORD")
             if admin_email and admin_pass:
@@ -643,16 +649,56 @@ def answer_assessment(assessment_id: int):
     if not assessment:
         flash("Avaliação não localizada.")
         return redirect(url_for("assessments"))
+        
     questions_rows = query_db("SELECT * FROM questions ORDER BY category, id")
+    
     if request.method == "POST":
         for q in questions_rows:
-            score, evidence, action_plan, note = int(request.form.get(f"score_{q['id']}", 0)), request.form.get(f"evidence_{q['id']}", "").strip(), request.form.get(f"action_{q['id']}", "").strip(), request.form.get(f"note_{q['id']}", "").strip()
-            execute_db("""INSERT INTO responses (assessment_id, question_id, score, evidence, action_plan, note, created_at) VALUES (%s, %s, %s, %s, %s, %s, %s) ON CONFLICT(assessment_id, question_id) DO UPDATE SET score=EXCLUDED.score, evidence=EXCLUDED.evidence, action_plan=EXCLUDED.action_plan, note=EXCLUDED.note""",
-                       (assessment_id, q["id"], score, evidence, action_plan, note, datetime.now().isoformat(timespec="seconds")))
+            qid = q['id']
+            
+            score = int(request.form.get(f"score_{qid}", 0))
+            evidence = request.form.get(f"evidence_{qid}", "").strip()
+            action_plan = request.form.get(f"action_{qid}", "").strip()
+            note = request.form.get(f"note_{qid}", "").strip()
+            
+            risk_prob = int(request.form.get(f"risk_prob_{qid}", 0))
+            risk_impact = int(request.form.get(f"risk_impact_{qid}", 0))
+            action_resp = request.form.get(f"action_resp_{qid}", "").strip()
+            action_deadline = request.form.get(f"action_deadline_{qid}", "").strip()
+            action_priority = request.form.get(f"action_priority_{qid}", "").strip()
+            action_status = request.form.get(f"action_status_{qid}", "A Fazer").strip()
+
+            execute_db("""
+                INSERT INTO responses (
+                    assessment_id, question_id, score, evidence, action_plan, note, created_at,
+                    risk_probability, risk_impact, action_responsible, action_deadline, action_priority, action_status
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                ON CONFLICT(assessment_id, question_id) DO UPDATE SET 
+                    score=EXCLUDED.score, 
+                    evidence=EXCLUDED.evidence, 
+                    action_plan=EXCLUDED.action_plan, 
+                    note=EXCLUDED.note,
+                    risk_probability=EXCLUDED.risk_probability,
+                    risk_impact=EXCLUDED.risk_impact,
+                    action_responsible=EXCLUDED.action_responsible,
+                    action_deadline=EXCLUDED.action_deadline,
+                    action_priority=EXCLUDED.action_priority,
+                    action_status=EXCLUDED.action_status
+                """,
+                (assessment_id, qid, score, evidence, action_plan, note, datetime.now().isoformat(timespec="seconds"),
+                 risk_prob, risk_impact, action_resp, action_deadline, action_priority, action_status)
+            )
+            
         result = compute_assessment(assessment_id)
-        execute_db("UPDATE assessments SET completed_at = %s, overall_score = %s, maturity_level = %s WHERE id = %s", (datetime.now().isoformat(timespec="seconds"), result["overall"], result["level"][0], assessment_id))
+        execute_db("""
+            UPDATE assessments 
+            SET completed_at = %s, overall_score = %s, maturity_level = %s 
+            WHERE id = %s
+        """, (datetime.now().isoformat(timespec="seconds"), result["overall"], result["level"][0], assessment_id))
+        
         flash("Respostas Gravadas. Relatório Consolidado.")
         return redirect(url_for("view_assessment", assessment_id=assessment_id))
+        
     existing = {r["question_id"]: r for r in query_db("SELECT * FROM responses WHERE assessment_id = %s", (assessment_id,))}
     return render_template("answer_assessment.html", assessment=assessment, questions=questions_rows, existing=existing, title=f"Questionário: {assessment['title']}")
 
