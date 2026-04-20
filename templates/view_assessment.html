@@ -37,7 +37,7 @@
 
 {% if benchmark %}
 <div class="card" style="margin-bottom: 30px; border-color: #3a86ff;">
-  <h2 style="color: #3a86ff; margin-bottom: 5px;">[ 📊 Benchmarking_de_Mercado ]</h2>
+  <h2 style="color: #3a86ff; margin-bottom: 5px;">[ Benchmarking_de_Mercado ]</h2>
   <p class="muted" style="font-size:13px; margin-bottom:20px; margin-top: 0;">Comparativo da sua maturidade ({{ '%.1f'|format(result.overall) if result else '0.0' }}%) contra o banco de dados do sistema.</p>
 
   <div class="grid-form" style="grid-template-columns: 1fr 1fr; gap: 20px;">
@@ -55,9 +55,9 @@
         <p style="font-size: 12px; margin-top: 5px;" class="muted">Baseado em {{ benchmark.count_sector }} empresa(s) do setor.</p>
         
         {% if result.overall >= benchmark.avg_sector %}
-          <div class="pill" style="background: var(--p-success); border: none; margin-top: 10px;">Acima da Média 🏆</div>
+          <div class="pill" style="background: var(--p-success); border: none; margin-top: 10px;">Acima da Média</div>
         {% else %}
-          <div class="pill" style="background: var(--p-warn); border: none; margin-top: 10px; color: black;">Abaixo da Média ⚠️</div>
+          <div class="pill" style="background: var(--p-warn); border: none; margin-top: 10px; color: black;">Abaixo da Média</div>
         {% endif %}
       {% else %}
         <div style="padding: 20px; background: #eee; font-style: italic; font-size: 13px;">Sua empresa é a pioneira deste setor no sistema!</div>
@@ -77,9 +77,9 @@
         <p style="font-size: 12px; margin-top: 5px;" class="muted">Baseado em {{ benchmark.count_size }} empresa(s) do mesmo porte.</p>
         
         {% if result.overall >= benchmark.avg_size %}
-          <div class="pill" style="background: var(--p-success); border: none; margin-top: 10px;">Acima da Média 🏆</div>
+          <div class="pill" style="background: var(--p-success); border: none; margin-top: 10px;">Acima da Média</div>
         {% else %}
-          <div class="pill" style="background: var(--p-warn); border: none; margin-top: 10px; color: black;">Abaixo da Média ⚠️</div>
+          <div class="pill" style="background: var(--p-warn); border: none; margin-top: 10px; color: black;">Abaixo da Média</div>
         {% endif %}
       {% else %}
         <div style="padding: 20px; background: #eee; font-style: italic; font-size: 13px;">Sem dados suficientes para este porte.</div>
