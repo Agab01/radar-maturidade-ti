@@ -3,21 +3,62 @@
 <div class="card" style="max-width: 700px; margin: 0 auto;">
   <h2>:: Editar_Empresa</h2>
   <form method="post" class="grid-form" style="margin-top:20px;">
-    <div class="form-group" style="grid-column: 1 / -1;"><label>Nome / Razão Social</label><input name="name"
-        value="{{ company.name }}" required></div>
-    <div class="form-group"><label>Setor_Atuação</label><input name="sector" value="{{ company.sector or '' }}"></div>
-    <div class="form-group"><label>Porte_Empresa</label><select name="size">{% for s in ['Pequena', 'Média', 'Grande',
-        'Enterprise'] %}<option value="{{ s }}" {% if company.size==s %}selected{% endif %}>{{ s }}</option>{% endfor
-        %}</select></div>
-    <div class="form-group"><label>Nome_Contato</label><input name="contact_name"
-        value="{{ company.contact_name or '' }}"></div>
-    <div class="form-group"><label>E-mail_Contato</label><input name="contact_email" type="email"
-        value="{{ company.contact_email or '' }}"></div>
+    
+    <div class="form-group" style="grid-column: 1 / -1;">
+      <label>Nome / Razão Social</label>
+      <input name="name" value="{{ company.name }}" required>
+    </div>
+
+    <div class="form-group">
+      <label>Setor_Atuação</label>
+      <select name="sector" required>
+        <option value="">-- Selecione o Setor --</option>
+        
+        <option value="Desenvolvimento de Software" {% if company.sector == 'Desenvolvimento de Software' %}selected{% endif %}>Desenvolvimento de Software</option>
+        <option value="Transporte e Logística" {% if company.sector == 'Transporte e Logística' %}selected{% endif %}>Transporte e Logística</option>
+        <option value="Energia e Infraestrutura" {% if company.sector == 'Energia e Infraestrutura' %}selected{% endif %}>Energia e Infraestrutura</option>
+        <option value="Tecnologia e Inovação" {% if company.sector == 'Tecnologia e Inovação' %}selected{% endif %}>Tecnologia e Inovação</option>
+        <option value="Saúde e Hospitais" {% if company.sector == 'Saúde e Hospitais' %}selected{% endif %}>Saúde e Hospitais</option>
+        <option value="Financeiro e Bancário" {% if company.sector == 'Financeiro e Bancário' %}selected{% endif %}>Financeiro e Bancário</option>
+        <option value="Varejo e E-commerce" {% if company.sector == 'Varejo e E-commerce' %}selected{% endif %}>Varejo e E-commerce</option>
+        <option value="Indústria e Manufatura" {% if company.sector == 'Indústria e Manufatura' %}selected{% endif %}>Indústria e Manufatura</option>
+        <option value="Educação e EdTech" {% if company.sector == 'Educação e EdTech' %}selected{% endif %}>Educação e EdTech</option>
+        <option value="Governo e Setor Público" {% if company.sector == 'Governo e Setor Público' %}selected{% endif %}>Governo e Setor Público</option>
+        <option value="Serviços Profissionais e Consultoria" {% if company.sector == 'Serviços Profissionais e Consultoria' %}selected{% endif %}>Serviços Profissionais e Consultoria</option>
+        <option value="Telecomunicações" {% if company.sector == 'Telecomunicações' %}selected{% endif %}>Telecomunicações</option>
+        <option value="Agronegócio" {% if company.sector == 'Agronegócio' %}selected{% endif %}>Agronegócio</option>
+        <option value="Mídia e Entretenimento" {% if company.sector == 'Mídia e Entretenimento' %}selected{% endif %}>Mídia e Entretenimento</option>
+        <option value="Seguros" {% if company.sector == 'Seguros' %}selected{% endif %}>Seguros</option>
+        <option value="Construção Civil e Imobiliário" {% if company.sector == 'Construção Civil e Imobiliário' %}selected{% endif %}>Construção Civil e Imobiliário</option>
+        <option value="Terceiro Setor e ONGs" {% if company.sector == 'Terceiro Setor e ONGs' %}selected{% endif %}>Terceiro Setor e ONGs</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Porte_Empresa</label>
+      <select name="size">
+        {% for s in ['Pequena', 'Média', 'Grande', 'Enterprise'] %}
+        <option value="{{ s }}" {% if company.size==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Nome_Contato</label>
+      <input name="contact_name" value="{{ company.contact_name or '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>E-mail_Contato</label>
+      <input name="contact_email" type="email" value="{{ company.contact_email or '' }}">
+    </div>
+
     <div class="actions-bottom-flex"
       style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
-      <a href="{{ url_for('companies') }}" class="btn secondary">Cancelar</a><button class="btn accent"
-        type="submit">Salvar_Alterações</button>
+      <a href="{{ url_for('companies') }}" class="btn secondary">Cancelar</a>
+      <button class="btn accent" type="submit">Salvar_Alterações</button>
     </div>
+
   </form>
 </div>
 {% endblock %}

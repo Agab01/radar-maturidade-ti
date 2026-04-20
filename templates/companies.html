@@ -6,7 +6,29 @@
   <h2>++ Nova_Empresa</h2>
   <form method="post" class="grid-form" style="margin-top:20px;">
     <div class="form-group"><label>Nome / Razão Social</label><input name="name" required></div>
-    <div class="form-group"><label>Setor_Atuação</label><input name="sector"></div>
+    <div class="form-group">
+  <label>Setor_Atuação</label>
+  <select name="sector" required>
+    <option value="">-- Selecione o Setor --</option>
+    <option value="Desenvolvimento de Software">Desenvolvimento de Software</option>
+    <option value="Transporte e Logística">Transporte e Logística</option>
+    <option value="Energia e Infraestrutura">Energia e Infraestrutura</option>
+    <option value="Tecnologia e Inovação">Tecnologia e Inovação</option>
+    <option value="Saúde e Hospitais">Saúde e Hospitais</option>
+    <option value="Financeiro e Bancário">Financeiro e Bancário</option>
+    <option value="Varejo e E-commerce">Varejo e E-commerce</option>
+    <option value="Indústria e Manufatura">Indústria e Manufatura</option>
+    <option value="Educação e EdTech">Educação e EdTech</option>
+    <option value="Governo e Setor Público">Governo e Setor Público</option>
+    <option value="Serviços Profissionais e Consultoria">Serviços Profissionais e Consultoria</option>
+    <option value="Telecomunicações">Telecomunicações</option>
+    <option value="Agronegócio">Agronegócio</option>
+    <option value="Mídia e Entretenimento">Mídia e Entretenimento</option>
+    <option value="Seguros">Seguros</option>
+    <option value="Construção Civil e Imobiliário">Construção Civil e Imobiliário</option>
+    <option value="Terceiro Setor e ONGs">Terceiro Setor e ONGs</option>
+  </select>
+</div>
     <div class="form-group"><label>Porte_Empresa</label><select name="size">
         <option>Pequena</option>
         <option>Média</option>

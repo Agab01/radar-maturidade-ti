@@ -706,17 +706,106 @@ def answer_assessment(assessment_id: int):
 @require_login
 @require_perm("view_reports")
 def view_assessment(assessment_id: int):
-    assessment = query_db("SELECT a.*, c.name company_name, c.sector, c.size, u.name evaluator_name FROM assessments a JOIN companies c ON c.id = a.company_id JOIN users u ON u.id = a.evaluator_id WHERE a.id = %s", (assessment_id,), one=True)
-    if not assessment:
-        flash("Relatório não localizado.")
-        return redirect(url_for("assessments"))
-    result = compute_assessment(assessment_id)
-    questions_by_category = {}
-    for row in result["rows"]: questions_by_category.setdefault(row["category"], []).append(row)
-    gaps = query_db("SELECT q.category, q.text, r.score, r.action_plan, r.evidence FROM responses r JOIN questions q ON q.id = r.question_id WHERE r.assessment_id = %s AND r.score <= 2 ORDER BY q.category, r.score ASC", (assessment_id,))
-    strengths = query_db("SELECT q.category, q.text, r.score, r.evidence FROM responses r JOIN questions q ON q.id = r.question_id WHERE r.assessment_id = %s AND r.score >= 4 ORDER BY q.category, r.score DESC", (assessment_id,))
+    assessment = query_db("""
+        SELECT a.*, c.name as company_name, c.sector, c.size 
+        FROM assessments a
+        JOIN companies c ON a.company_id = c.id
+        WHERE a.id = %s
+    """, (assessment_id,), one=True)
     
-    return render_template("view_assessment.html", assessment=assessment, result=result, level_name=result["level"][0], level_class=result["level"][1], explanation=result["level"][2], strengths=strengths, gaps=gaps, questions_by_category=questions_by_category, title=f"RELATÓRIO: {assessment['company_name']}")
+    if not assessment:
+        flash("Avaliação não encontrada.")
+        return redirect(url_for("assessments"))
+        
+    responses = query_db("""
+        SELECT r.*, q.category, q.text, q.cid_pillar, q.gov_or_mgt 
+        FROM responses r
+        JOIN questions q ON r.question_id = q.id
+        WHERE r.assessment_id = %s
+    """, (assessment_id,))
+    
+    result = compute_assessment(assessment_id)
+    level_tuple = result["level"] if result else ("Indefinido", "", "Sem dados")
+    
+    gaps = [r for r in responses if r['score'] <= 2]
+    strengths = [r for r in responses if r['score'] >= 4]
+    
+    questions_by_category = {}
+    cat_scores = {}
+    for r in responses:
+        cat = r['category']
+        if cat not in questions_by_category:
+            questions_by_category[cat] = []
+        questions_by_category[cat].append(r)
+        
+        if cat not in cat_scores:
+            cat_scores[cat] = []
+        cat_scores[cat].append(r['score'])
+        
+    radar_labels = list(cat_scores.keys())
+    radar_data = [round((sum(v)/len(v)) * 20, 1) if v else 0 for v in cat_scores.values()]
+    
+    risks = [r for r in responses if r['risk_probability'] and r['risk_impact']]
+    for r in risks:
+        r['risk_score'] = r['risk_probability'] * r['risk_impact']
+    top_risks = sorted(risks, key=lambda x: x['risk_score'], reverse=True)[:3]
+    
+    actions = [r for r in responses if r['action_plan']]
+    action_stats = {
+        'total': len(actions),
+        'a_fazer': len([a for a in actions if a['action_status'] == 'A Fazer']),
+        'andamento': len([a for a in actions if a['action_status'] == 'Em Andamento']),
+        'concluido': len([a for a in actions if a['action_status'] == 'Concluído'])
+    }
+
+    history_rows = query_db("""
+        SELECT title, overall_score, completed_at 
+        FROM assessments 
+        WHERE company_id = %s AND completed_at IS NOT NULL 
+        ORDER BY completed_at ASC
+    """, (assessment['company_id'],))
+    history_labels = [h['completed_at'][:10] for h in history_rows]
+    history_data = [h['overall_score'] for h in history_rows]
+
+    
+    my_sector = assessment['sector']
+    my_size = assessment['size']
+
+    all_completed = query_db("""
+        SELECT a.overall_score, c.sector, c.size 
+        FROM assessments a
+        JOIN companies c ON a.company_id = c.id
+        WHERE a.completed_at IS NOT NULL AND a.id != %s
+    """, (assessment_id,))
+
+    sector_scores = []
+    size_scores = []
+
+    for row in all_completed:
+        # Se os textos baterem exatamente, entra na média!
+        if row['sector'] == my_sector:
+            sector_scores.append(row['overall_score'])
+        if row['size'] == my_size:
+            size_scores.append(row['overall_score'])
+
+    benchmark = {
+        'my_macro_sector': my_sector or "Não Informado",
+        'avg_sector': round(sum(sector_scores)/len(sector_scores), 1) if sector_scores else None,
+        'count_sector': len(sector_scores),
+        'avg_size': round(sum(size_scores)/len(size_scores), 1) if size_scores else None,
+        'count_size': len(size_scores)
+    }
+
+    return render_template(
+        "view_assessment.html", 
+        assessment=assessment, responses=responses, result=result, 
+        level_name=level_tuple[0], level_class=level_tuple[1], explanation=level_tuple[2], 
+        gaps=gaps, strengths=strengths, questions_by_category=questions_by_category, 
+        radar_labels=radar_labels, radar_data=radar_data, top_risks=top_risks, action_stats=action_stats, 
+        history_labels=history_labels, history_data=history_data,
+        benchmark=benchmark, 
+        title=f"Relatório: {assessment.get('title', 'Avaliação')}"
+    )
 
 if __name__ == "__main__":
     init_db()
