@@ -1,21 +1,65 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="card" style="max-width: 800px; margin: 0 auto;">
-  <h2>:: Editar_Quesito_Framework</h2>
+<div class="card">
+  <h2>** Editar_Quesito</h2>
+  
   <form method="post" class="grid-form" style="margin-top:20px;">
-    <div class="form-group"><label>Domínio / Categoria</label><select name="category">{% for c in categories %}<option
-          value="{{ c }}" {% if question.category==c %}selected{% endif %}>{{ c }}</option>{% endfor %}</select></div>
-    <div class="form-group"><label>Peso_Relevância (0.1 - 5.0)</label><input name="weight" type="number" step="0.1"
-        value="{{ question.weight }}"></div>
-    <div class="form-group" style="grid-column: 1 / -1;"><label>Enunciado da Questão / Quesito</label><textarea
-        name="text" style="min-height: 70px;" required>{{ question.text }}</textarea></div>
-    <div class="form-group" style="grid-column: 1 / -1;"><label>Guia de Avaliação (Instruções)</label><textarea
-        name="guidance" style="min-height: 50px;">{{ question.guidance or '' }}</textarea></div>
-    <div class="actions-bottom-flex"
-      style="grid-column: 1 / -1; display:flex; gap:10px; justify-content: flex-end; margin-top:10px;">
-      <a href="{{ url_for('questions') }}" class="btn secondary">Cancelar</a><button class="btn accent"
-        type="submit">Salvar_Quesito</button>
+    
+    <div class="form-group">
+      <label>Domínio / Categoria (COBIT/ITIL)</label>
+      <select name="category">
+        {% for c in categories %}
+          <option value="{{ c }}" {% if question.category == c %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
     </div>
+    
+    <div class="form-group">
+      <label>Peso_Relevância (0.1 - 5.0)</label>
+      <input name="weight" type="number" step="0.1" value="{{ question.weight }}">
+    </div>
+
+    <div class="form-group">
+      <label>Nível (COBIT: Gov vs Gestão)</label>
+      <select name="gov_or_mgt">
+        {% for g in gov_mgt_types %}
+          <option value="{{ g }}" {% if question.gov_or_mgt == g %}selected{% endif %}>{{ g }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Framework Principal</label>
+      <select name="framework_ref">
+        {% for f in frameworks %}
+          <option value="{{ f }}" {% if question.framework_ref == f %}selected{% endif %}>{{ f }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Pilar de Segurança (ISO 27000)</label>
+      <select name="cid_pillar">
+        {% for p in cid_pillars %}
+          <option value="{{ p }}" {% if question.cid_pillar == p %}selected{% endif %}>{{ p }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group" style="grid-column: 1 / -1;">
+      <label>Enunciado da Questão / Quesito</label>
+      <textarea name="text" style="min-height: 70px;" required>{{ question.text }}</textarea>
+    </div>
+    
+    <div class="form-group" style="grid-column: 1 / -1;">
+      <label>Guia de Avaliação (Instruções)</label>
+      <textarea name="guidance" style="min-height: 50px;">{{ question.guidance }}</textarea>
+    </div>
+    
+    <div style="grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <a href="{{ url_for('questions') }}" class="btn secondary">Voltar / Cancelar</a>
+      <button class="btn accent" type="submit" style="width:100%; max-width:250px;">Salvar Alterações</button>
+    </div>
+
   </form>
 </div>
 {% endblock %}

@@ -30,7 +30,22 @@ if not DATABASE_URL:
     raise ValueError("ERRO CRÍTICO: DATABASE_URL não encontrada. Verifique seu arquivo .env!")
 
 SCORING = {0: "Não se aplica", 1: "Inexistente", 2: "Inicial", 3: "Parcial", 4: "Consistente", 5: "Totalmente implementado"}
-CATEGORIES = ["Processos de TI", "Ferramentas de TI", "Nível de Serviço", "Alinhamento Estratégico", "Governança de TI", "Gestão de Riscos", "Cultura de TI"]
+CATEGORIES = [
+    "Governança Estratégica de TI", 
+    "Gestão de Processos e Operações", 
+    "Gestão de Projetos e Mudanças", 
+    "Gestão de Serviços e Nível de Serviço", 
+    "Segurança da Informação e Conformidade", 
+    "Gestão de Riscos", 
+    "Alinhamento Estratégico e Valor de TI", 
+    "Cultura, Pessoas e Competências", 
+    "Infraestrutura, Ferramentas e Automação"
+]
+
+CID_PILLARS = ["N/A", "Confidencialidade", "Integridade", "Disponibilidade"]
+GOV_MGT_TYPES = ["Gestão (Execução/Operação)", "Governança (Avaliar/Direcionar/Monitorar)"]
+FRAMEWORKS = ["N/A", "COBIT 5", "ITIL 4", "ISO/IEC 27000", "Múltiplos"]
+
 ROLE_PERMISSIONS = {
     "admin": {"manage_users", "manage_companies", "manage_questions", "respond", "view_reports"},
     "analista": {"manage_companies", "manage_questions", "view_reports"},
@@ -78,6 +93,9 @@ def init_db() -> None:
         """)
         cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash TEXT;")
         cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires_at TEXT;")
+        cur.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS cid_pillar TEXT DEFAULT 'N/A';")
+        cur.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS gov_or_mgt TEXT DEFAULT 'Gestão (Execução/Operação)';")
+        cur.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS framework_ref TEXT DEFAULT 'N/A';")
 
         cur.execute("SELECT id FROM users LIMIT 1")
         if not cur.fetchone():
@@ -488,12 +506,37 @@ def questions():
         if not has_perm("manage_questions"):
             flash("Permissão Negada.")
             return redirect(url_for("questions"))
-        execute_db("INSERT INTO questions (category, text, weight, guidance, created_at) VALUES (%s, %s, %s, %s, %s)",
-                   (request.form["category"], request.form["text"], float(request.form.get("weight", 1) or 1), request.form.get("guidance"), datetime.now().isoformat(timespec="seconds")))
-        flash("Quesito Adicionado.")
+        
+        # Inserindo os novos campos no SQL
+        execute_db("""
+            INSERT INTO questions (category, text, weight, guidance, created_at, cid_pillar, gov_or_mgt, framework_ref) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            request.form["category"], 
+            request.form["text"], 
+            float(request.form.get("weight", 1) or 1), 
+            request.form.get("guidance"), 
+            datetime.now().isoformat(timespec="seconds"),
+            request.form.get("cid_pillar", "N/A"),
+            request.form.get("gov_or_mgt", "Gestão (Execução/Operação)"),
+            request.form.get("framework_ref", "N/A")
+        ))
+        
+        flash("Quesito Adicionado com as Novas Dimensões.")
         return redirect(url_for("questions"))
+        
     rows = query_db("SELECT * FROM questions ORDER BY category, id")
-    return render_template("questions.html", rows=rows, categories=CATEGORIES, title="Base_Questões")
+    
+    # Enviando as novas listas para o HTML
+    return render_template(
+        "questions.html", 
+        rows=rows, 
+        categories=CATEGORIES, 
+        cid_pillars=CID_PILLARS, 
+        gov_mgt_types=GOV_MGT_TYPES, 
+        frameworks=FRAMEWORKS, 
+        title="Base_Questões"
+    )
 
 @app.route("/questions/<int:question_id>/edit", methods=["GET", "POST"])
 @require_login
@@ -503,12 +546,35 @@ def edit_question(question_id):
     if not question:
         flash("Questão não encontrada.")
         return redirect(url_for("questions"))
+        
     if request.method == "POST":
-        execute_db("UPDATE questions SET category=%s, text=%s, weight=%s, guidance=%s WHERE id=%s",
-                   (request.form["category"], request.form["text"], float(request.form.get("weight", 1) or 1), request.form.get("guidance"), question_id))
-        flash("Quesito atualizado.")
+        execute_db("""
+            UPDATE questions 
+            SET category=%s, text=%s, weight=%s, guidance=%s, 
+                cid_pillar=%s, gov_or_mgt=%s, framework_ref=%s 
+            WHERE id=%s
+        """, (
+            request.form["category"], 
+            request.form["text"], 
+            float(request.form.get("weight", 1) or 1), 
+            request.form.get("guidance"),
+            request.form.get("cid_pillar", "N/A"),
+            request.form.get("gov_or_mgt", "Gestão (Execução/Operação)"),
+            request.form.get("framework_ref", "N/A"),
+            question_id
+        ))
+        flash("Quesito atualizado com as novas dimensões.")
         return redirect(url_for("questions"))
-    return render_template("edit_question.html", question=question, categories=CATEGORIES, title="Editar_Quesito")
+        
+    return render_template(
+        "edit_question.html", 
+        question=question, 
+        categories=CATEGORIES,
+        cid_pillars=CID_PILLARS, 
+        gov_mgt_types=GOV_MGT_TYPES, 
+        frameworks=FRAMEWORKS,
+        title="Editar_Quesito"
+    )
 
 @app.route("/questions/<int:question_id>/delete", methods=["POST"])
 @require_login
