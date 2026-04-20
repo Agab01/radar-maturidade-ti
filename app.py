@@ -513,11 +513,11 @@ def questions():
             flash("Permissão Negada.")
             return redirect(url_for("questions"))
         
-        # Inserindo os novos campos no SQL
         execute_db("""
-            INSERT INTO questions (category, text, weight, guidance, created_at, cid_pillar, gov_or_mgt, framework_ref) 
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO questions (module, category, text, weight, guidance, created_at, cid_pillar, gov_or_mgt, framework_ref) 
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
+            request.form.get("module", "Maturidade"),
             request.form["category"], 
             request.form["text"], 
             float(request.form.get("weight", 1) or 1), 
@@ -530,10 +530,9 @@ def questions():
         
         flash("Quesito Adicionado com as Novas Dimensões.")
         return redirect(url_for("questions"))
-        
-    rows = query_db("SELECT * FROM questions ORDER BY category, id")
+      
+    rows = query_db("SELECT * FROM questions ORDER BY module DESC, category, id")
     
-    # Enviando as novas listas para o HTML
     return render_template(
         "questions.html", 
         rows=rows, 
@@ -556,10 +555,11 @@ def edit_question(question_id):
     if request.method == "POST":
         execute_db("""
             UPDATE questions 
-            SET category=%s, text=%s, weight=%s, guidance=%s, 
+            SET module=%s, category=%s, text=%s, weight=%s, guidance=%s, 
                 cid_pillar=%s, gov_or_mgt=%s, framework_ref=%s 
             WHERE id=%s
         """, (
+            request.form.get("module", "Maturidade"),
             request.form["category"], 
             request.form["text"], 
             float(request.form.get("weight", 1) or 1), 
@@ -626,19 +626,20 @@ def new_assessment():
     if request.method == "POST":
         company_id = request.form.get("company_id")
         title = request.form.get("title")
+        module_type = request.form.get("module", "Maturidade") 
         
         if not company_id:
             flash("Selecione uma empresa válida.")
             return redirect(url_for("new_assessment"))
+            
         assessment_id = execute_db("""
-            INSERT INTO assessments (company_id, title, evaluator_id, started_at) 
-            VALUES (%s, %s, %s, %s) RETURNING id
-        """, (company_id, title, session["user_id"], datetime.now().isoformat(timespec="seconds")))
+            INSERT INTO assessments (company_id, title, evaluator_id, started_at, module) 
+            VALUES (%s, %s, %s, %s, %s) RETURNING id
+        """, (company_id, title, session["user_id"], datetime.now().isoformat(timespec="seconds"), module_type))
         
         return redirect(url_for("answer_assessment", assessment_id=assessment_id))
         
     pre_company = request.args.get("company_id", 0) 
-  
     return render_template("new_assessment.html", companies=companies_list, title="Iniciar_Avaliação", pre_company=pre_company)
 
 @app.route("/assessments/<int:assessment_id>/answer", methods=["GET", "POST"])
@@ -650,17 +651,18 @@ def answer_assessment(assessment_id: int):
         flash("Avaliação não localizada.")
         return redirect(url_for("assessments"))
         
-    questions_rows = query_db("SELECT * FROM questions ORDER BY category, id")
+    questions_rows = query_db(
+        "SELECT * FROM questions WHERE module = %s ORDER BY category, id", 
+        (assessment.get('module', 'Maturidade'),)
+    )
     
     if request.method == "POST":
         for q in questions_rows:
             qid = q['id']
-            
             score = int(request.form.get(f"score_{qid}", 0))
             evidence = request.form.get(f"evidence_{qid}", "").strip()
             action_plan = request.form.get(f"action_{qid}", "").strip()
             note = request.form.get(f"note_{qid}", "").strip()
-            
             risk_prob = int(request.form.get(f"risk_prob_{qid}", 0))
             risk_impact = int(request.form.get(f"risk_impact_{qid}", 0))
             action_resp = request.form.get(f"action_resp_{qid}", "").strip()
@@ -674,16 +676,9 @@ def answer_assessment(assessment_id: int):
                     risk_probability, risk_impact, action_responsible, action_deadline, action_priority, action_status
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 ON CONFLICT(assessment_id, question_id) DO UPDATE SET 
-                    score=EXCLUDED.score, 
-                    evidence=EXCLUDED.evidence, 
-                    action_plan=EXCLUDED.action_plan, 
-                    note=EXCLUDED.note,
-                    risk_probability=EXCLUDED.risk_probability,
-                    risk_impact=EXCLUDED.risk_impact,
-                    action_responsible=EXCLUDED.action_responsible,
-                    action_deadline=EXCLUDED.action_deadline,
-                    action_priority=EXCLUDED.action_priority,
-                    action_status=EXCLUDED.action_status
+                    score=EXCLUDED.score, evidence=EXCLUDED.evidence, action_plan=EXCLUDED.action_plan, note=EXCLUDED.note,
+                    risk_probability=EXCLUDED.risk_probability, risk_impact=EXCLUDED.risk_impact, action_responsible=EXCLUDED.action_responsible,
+                    action_deadline=EXCLUDED.action_deadline, action_priority=EXCLUDED.action_priority, action_status=EXCLUDED.action_status
                 """,
                 (assessment_id, qid, score, evidence, action_plan, note, datetime.now().isoformat(timespec="seconds"),
                  risk_prob, risk_impact, action_resp, action_deadline, action_priority, action_status)
@@ -691,9 +686,7 @@ def answer_assessment(assessment_id: int):
             
         result = compute_assessment(assessment_id)
         execute_db("""
-            UPDATE assessments 
-            SET completed_at = %s, overall_score = %s, maturity_level = %s 
-            WHERE id = %s
+            UPDATE assessments SET completed_at = %s, overall_score = %s, maturity_level = %s WHERE id = %s
         """, (datetime.now().isoformat(timespec="seconds"), result["overall"], result["level"][0], assessment_id))
         
         flash("Respostas Gravadas. Relatório Consolidado.")
@@ -767,7 +760,7 @@ def view_assessment(assessment_id: int):
     history_labels = [h['completed_at'][:10] for h in history_rows]
     history_data = [h['overall_score'] for h in history_rows]
 
-    
+
     my_sector = assessment['sector']
     my_size = assessment['size']
 
