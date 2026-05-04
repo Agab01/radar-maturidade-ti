@@ -93,49 +93,83 @@
     {% endif %}
 
     <div style="border-top: var(--border-thick); padding-top: 15px; margin-top: 15px;">
-      <h4 style="margin-bottom: 15px;">[ Plano de Ação Estruturado ]</h4>
-      <div class="form-group" style="margin-bottom: 15px;">
-        <label>_AÇÃO_RECOMENDADA</label>
-        <textarea name="action_{{ q.id }}" placeholder="Descreva a ação corretiva..."
-          style="min-height: 60px;">{{ existing.get(q.id)['action_plan'] if existing.get(q.id) else '' }}</textarea>
-      </div>
+      <h4 style="margin-bottom: 15px;">[ Metodologia 5W2H - Plano de Ação ]</h4>
 
-      <div class="grid-form" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-        <div class="form-group">
-          <label>_RESPONSÁVEL</label>
-          <input type="text" name="action_resp_{{ q.id }}" placeholder="Nome/Setor"
-            value="{{ existing.get(q.id)['action_responsible'] if existing.get(q.id) else '' }}">
-        </div>
-        <div class="form-group">
-          <label>_PRAZO (DEADLINE)</label>
-          <input type="date" name="action_deadline_{{ q.id }}"
-            value="{{ existing.get(q.id)['action_deadline'] if existing.get(q.id) else '' }}">
-        </div>
-        <div class="form-group">
-          <label>_PRIORIDADE</label>
-          <select name="action_priority_{{ q.id }}">
-            <option value="" {% if not existing.get(q.id) or not existing[q.id]['action_priority'] %}selected{% endif
-              %}>-- Selecione --</option>
-            <option value="Baixa" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Baixa' %}selected{%
-              endif %}>Baixa</option>
-            <option value="Média" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Média' %}selected{%
-              endif %}>Média</option>
-            <option value="Alta" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Alta' %}selected{%
-              endif %}>Alta</option>
-            <option value="Crítica" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Crítica'
-              %}selected{% endif %}>Crítica</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>_STATUS</label>
-          <select name="action_status_{{ q.id }}">
-            <option value="A Fazer" {% if not existing.get(q.id) or existing[q.id]['action_status']=='A Fazer'
-              %}selected{% endif %}>A Fazer</option>
-            <option value="Em Andamento" {% if existing.get(q.id) and existing[q.id]['action_status']=='Em Andamento'
-              %}selected{% endif %}>Em Andamento</option>
-            <option value="Concluído" {% if existing.get(q.id) and existing[q.id]['action_status']=='Concluído'
-              %}selected{% endif %}>Concluído</option>
-          </select>
+      <div style="background: #f8f8f8; padding: 15px; border: var(--border-thin);">
+        <div class="grid-form" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+
+          <!-- 5W -->
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>What (O que será feito?)</label>
+            <input type="text" name="action_{{ q.id }}" placeholder="Ação corretiva..."
+              value="{{ existing.get(q.id)['action_plan'] if existing.get(q.id) else '' }}">
+          </div>
+
+          <div class="form-group">
+            <label>Why (Por que será feito?)</label>
+            <input type="text" name="action_why_{{ q.id }}" placeholder="Motivo/Justificativa"
+              value="{{ existing.get(q.id)['action_why'] if existing.get(q.id) else '' }}">
+          </div>
+
+          <div class="form-group">
+            <label>Where (Onde será feito?)</label>
+            <input type="text" name="action_where_{{ q.id }}" placeholder="Setor/Sistema"
+              value="{{ existing.get(q.id)['action_where'] if existing.get(q.id) else '' }}">
+          </div>
+
+          <div class="form-group">
+            <label>When (Quando? / Prazo)</label>
+            <input type="date" name="action_deadline_{{ q.id }}"
+              value="{{ existing.get(q.id)['action_deadline'] if existing.get(q.id) else '' }}">
+          </div>
+
+          <div class="form-group">
+            <label>Who (Por quem? / Responsável)</label>
+            <input type="text" name="action_resp_{{ q.id }}" placeholder="Nome/Equipe"
+              value="{{ existing.get(q.id)['action_responsible'] if existing.get(q.id) else '' }}">
+          </div>
+
+          <!-- 2H -->
+          <div class="form-group" style="grid-column: 1 / -1;">
+            <label>How (Como será feito?)</label>
+            <input type="text" name="action_how_{{ q.id }}" placeholder="Passo a passo ou método"
+              value="{{ existing.get(q.id)['action_how'] if existing.get(q.id) else '' }}">
+          </div>
+
+          <div class="form-group">
+            <label>How Much (Quanto vai custar?)</label>
+            <input type="text" placeholder="Ex: R$ 5.000,00 ou Sem Custo" name="action_cost_{{ q.id }}"
+              value="{{ existing.get(q.id)['action_cost'] if existing.get(q.id) else '' }}">
+          </div>
+
+          <!-- Priority & Status -->
+          <div class="form-group">
+            <label>_PRIORIDADE</label>
+            <select name="action_priority_{{ q.id }}">
+              <option value="" {% if not existing.get(q.id) or not existing[q.id]['action_priority'] %}selected{% endif
+                %}>-- Selecione --</option>
+              <option value="Baixa" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Baixa' %}selected{%
+                endif %}>Baixa</option>
+              <option value="Média" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Média' %}selected{%
+                endif %}>Média</option>
+              <option value="Alta" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Alta' %}selected{%
+                endif %}>Alta</option>
+              <option value="Crítica" {% if existing.get(q.id) and existing[q.id]['action_priority']=='Crítica'
+                %}selected{% endif %}>Crítica</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>_STATUS</label>
+            <select name="action_status_{{ q.id }}">
+              <option value="A Fazer" {% if not existing.get(q.id) or existing[q.id]['action_status']=='A Fazer'
+                %}selected{% endif %}>A Fazer</option>
+              <option value="Em Andamento" {% if existing.get(q.id) and existing[q.id]['action_status']=='Em Andamento'
+                %}selected{% endif %}>Em Andamento</option>
+              <option value="Concluído" {% if existing.get(q.id) and existing[q.id]['action_status']=='Concluído'
+                %}selected{% endif %}>Concluído</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>

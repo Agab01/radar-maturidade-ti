@@ -661,27 +661,37 @@ def answer_assessment(assessment_id: int):
             qid = q['id']
             score = int(request.form.get(f"score_{qid}", 0))
             evidence = request.form.get(f"evidence_{qid}", "").strip()
-            action_plan = request.form.get(f"action_{qid}", "").strip()
             note = request.form.get(f"note_{qid}", "").strip()
+ 
             risk_prob = int(request.form.get(f"risk_prob_{qid}", 0))
             risk_impact = int(request.form.get(f"risk_impact_{qid}", 0))
-            action_resp = request.form.get(f"action_resp_{qid}", "").strip()
-            action_deadline = request.form.get(f"action_deadline_{qid}", "").strip()
+            
+            action_plan = request.form.get(f"action_{qid}", "").strip() # 1. What
+            action_why = request.form.get(f"action_why_{qid}", "").strip() # 2. Why
+            action_where = request.form.get(f"action_where_{qid}", "").strip() # 3. Where
+            action_deadline = request.form.get(f"action_deadline_{qid}", "").strip() # 4. When
+            action_resp = request.form.get(f"action_resp_{qid}", "").strip() # 5. Who
+            action_how = request.form.get(f"action_how_{qid}", "").strip() # 6. How
+            action_cost = request.form.get(f"action_cost_{qid}", "").strip() # 7. How Much
+            
             action_priority = request.form.get(f"action_priority_{qid}", "").strip()
             action_status = request.form.get(f"action_status_{qid}", "A Fazer").strip()
 
             execute_db("""
                 INSERT INTO responses (
                     assessment_id, question_id, score, evidence, action_plan, note, created_at,
-                    risk_probability, risk_impact, action_responsible, action_deadline, action_priority, action_status
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                    risk_probability, risk_impact, action_responsible, action_deadline, action_priority, action_status,
+                    action_why, action_where, action_how, action_cost
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                 ON CONFLICT(assessment_id, question_id) DO UPDATE SET 
                     score=EXCLUDED.score, evidence=EXCLUDED.evidence, action_plan=EXCLUDED.action_plan, note=EXCLUDED.note,
                     risk_probability=EXCLUDED.risk_probability, risk_impact=EXCLUDED.risk_impact, action_responsible=EXCLUDED.action_responsible,
-                    action_deadline=EXCLUDED.action_deadline, action_priority=EXCLUDED.action_priority, action_status=EXCLUDED.action_status
+                    action_deadline=EXCLUDED.action_deadline, action_priority=EXCLUDED.action_priority, action_status=EXCLUDED.action_status,
+                    action_why=EXCLUDED.action_why, action_where=EXCLUDED.action_where, action_how=EXCLUDED.action_how, action_cost=EXCLUDED.action_cost
                 """,
                 (assessment_id, qid, score, evidence, action_plan, note, datetime.now().isoformat(timespec="seconds"),
-                 risk_prob, risk_impact, action_resp, action_deadline, action_priority, action_status)
+                 risk_prob, risk_impact, action_resp, action_deadline, action_priority, action_status,
+                 action_why, action_where, action_how, action_cost)
             )
             
         result = compute_assessment(assessment_id)
