@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Plano Diretor de TI</title>
+    <style>
+        /* Regra @page adaptada para xhtml2pdf */
+        @page {
+            size: A4;
+            margin-top: 2cm;
+            margin-bottom: 2.5cm;
+            margin-left: 1.5cm;
+            margin-right: 1.5cm;
+            
+            /* Define um "quadro" no rodapé para receber o texto */
+            @frame footer_frame {
+                -pdf-frame-content: footer_content;
+                left: 1.5cm;
+                right: 1.5cm;
+                bottom: 1cm;
+                height: 1cm;
+            }
+        }
+        
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #1a1a1a;
+            line-height: 1.5;
+            font-size: 11pt;
+        }
+        
+        .header {
+            background-color: #000000;
+            color: #ccff00;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 24pt;
+        }
+        
+        .header p {
+            color: #ffffff;
+            margin: 5px 0 0 0;
+            font-size: 12pt;
+        }
+        
+        /* O conteúdo gerado pela IA entra aqui */
+        h2 {
+            color: #000000;
+            border-left: 5px solid #ccff00;
+            padding-left: 10px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+        }
+        
+        h3 {
+            color: #333333;
+            margin-top: 20px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        
+        th, td {
+            border: 1px solid #dddddd;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="footer_content" style="text-align: right; font-size: 9pt; color: #666666; border-top: 1px solid #cccccc; padding-top: 5px;">
+        PDTI - {{ company_name }} | Página <pdf:pagenumber> de <pdf:pagecount>
+    </div>
+
+    <div class="header">
+        <h1>Plano Diretor de TI (PDTI)</h1>
+        <p>Empresa: {{ company_name }} | Score Atual: {{ score }}%</p>
+    </div>
+
+    <div class="content">
+        {{ content | safe }}
+    </div>
+
+</body>
+</html>

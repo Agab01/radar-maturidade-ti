@@ -5,14 +5,17 @@ import secrets
 import hashlib
 import smtplib
 import ssl
+import markdown
+import io
 from email.message import EmailMessage
 from datetime import datetime, timedelta
 from functools import wraps
 from typing import Dict, Tuple
-
+from xhtml2pdf import pisa
+from google import genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from flask import Flask, flash, g, redirect, render_template, request, session, url_for
+from flask import Flask, flash, g, redirect, render_template, request, session, url_for, jsonify, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 from dotenv import load_dotenv
 
@@ -21,7 +24,7 @@ load_dotenv()
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "fallback-inseguro-apenas-para-dev")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=1440)
-app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_SECURE"] = False
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
@@ -224,7 +227,6 @@ def login():
             session.permanent = True
             session["user_id"], session["user_name"], session["role"] = user["id"], user["name"], user["role"]
             return redirect(url_for("dashboard"))
-        flash("Acesso Negado. Credenciais Incorretas.")
     return render_template("login.html", is_login=True, title="LOGIN / RADAR.TI")
 
 @app.route("/register", methods=["GET", "POST"])
@@ -705,6 +707,140 @@ def answer_assessment(assessment_id: int):
     existing = {r["question_id"]: r for r in query_db("SELECT * FROM responses WHERE assessment_id = %s", (assessment_id,))}
     return render_template("answer_assessment.html", assessment=assessment, questions=questions_rows, existing=existing, title=f"Questionário: {assessment['title']}")
 
+
+client = genai.Client()
+
+@app.route("/assessments/<int:assessment_id>/generate-pdti", methods=["POST"])
+@require_login
+def generate_pdti(assessment_id):
+    from google import genai
+    client = genai.Client()
+    
+    # 1. Buscar os dados da avaliação e da empresa
+    assessment = query_db("SELECT a.*, c.name as company_name FROM assessments a JOIN companies c ON a.company_id = c.id WHERE a.id = %s", (assessment_id,), one=True)
+    
+    responses = query_db("""
+        SELECT q.text as question, q.category, r.score, r.action_plan, r.action_why, r.action_deadline, r.action_cost, r.action_responsible 
+        FROM responses r 
+        JOIN questions q ON r.question_id = q.id 
+        WHERE r.assessment_id = %s
+    """, (assessment_id,))
+    
+    # 2. Puxa o nome do avaliador (com trava de segurança)
+    nome_avaliador = session.get("user_name")
+    if not nome_avaliador or nome_avaliador.strip() == "":
+        nome_avaliador = "Consultoria Radar.TI" # Nome de fallback caso a sessão falhe
+    
+    # 3. Montar o Contexto
+    contexto_dados = f"Empresa: {assessment['company_name']}\nScore Geral Atual: {assessment.get('overall_score', 0)}%\n\nDETALHES DO DIAGNÓSTICO:\n"
+    for r in responses:
+        responsavel = r.get('action_responsible') or 'A definir'
+        contexto_dados += f"- Domínio: {r['category']} | Quesito: {r['question']}\n"
+        contexto_dados += f"  Nota: {r['score']}/5\n"
+        if r['action_plan']:
+            contexto_dados += f"  Ação Planejada: {r['action_plan']} | Por que: {r['action_why']} | Prazo: {r['action_deadline']} | Custo: {r['action_cost']} | Responsável: {responsavel}\n"
+        contexto_dados += "\n"
+
+    # 4. O Prompt de Sistema (A estrutura do 1º com o conteúdo do 2º)
+    instrucoes = f"""
+    Você é um Consultor Sênior de Governança de TI. Sua tarefa é ler os dados do diagnóstico de TI e redigir um PDTI (Plano Diretor de Tecnologia da Informação) executivo.
+    
+    Formate a sua resposta em Markdown. Estrutura obrigatória:
+    1. Resumo Executivo.
+    2. Alinhamento Estratégico, Governança e Metodologia (Descreva a metodologia recomendada e como a governança será aplicada).
+    3. Principais Gaps e Riscos Encontrados.
+    4. Mapa do Plano de Ação e Cronograma (Resuma as ações planejadas garantindo a exibição dos responsáveis, prazos e custos).
+    5. Indicadores de Sucesso (KPIs para medir a evolução do plano).
+    6. Conclusão.
+    
+    Seja formal e direto. Não invente dados numéricos que não foram fornecidos.
+    
+    REGRA CRÍTICA DE ASSINATURA: O documento foi elaborado por "{nome_avaliador}". No final da conclusão, você deve assinar EXATAMENTE como: "Consultor: {nome_avaliador}". É terminantemente proibido utilizar colchetes como [Seu Nome] ou [Nome da Empresa].
+    """
+
+    try:
+        # 5. Chamar a API do Gemini
+        prompt_completo = f"{instrucoes}\n\n--- DADOS DA EMPRESA ---\n{contexto_dados}"
+        
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt_completo
+        )
+        
+        pdti_text = response.text
+        
+        # 6. Retornar para o frontend
+        return jsonify({"status": "success", "pdti": pdti_text})
+        
+    except Exception as e:
+        print(f"Erro na IA: {e}", flush=True)
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+@app.route("/assessments/<int:assessment_id>/download-pdti", methods=["GET"])
+@require_login
+def download_pdti_pdf(assessment_id):
+    import io
+    import markdown
+    from xhtml2pdf import pisa
+    from google import genai
+    from flask import send_file, render_template, redirect, url_for, flash
+    
+    # 1. Puxa os dados e a inteligência do Gemini
+    client = genai.Client()
+    
+    assessment = query_db("SELECT a.*, c.name as company_name FROM assessments a JOIN companies c ON a.company_id = c.id WHERE a.id = %s", (assessment_id,), one=True)
+    
+    responses = query_db("SELECT q.text as question, q.category, r.score, r.action_plan, r.action_why, r.action_deadline, r.action_cost FROM responses r JOIN questions q ON r.question_id = q.id WHERE r.assessment_id = %s", (assessment_id,))
+    
+    contexto_dados = f"Empresa: {assessment['company_name']}\nScore Atual: {assessment.get('overall_score', 0)}%\n\nDETALHES:\n"
+    for r in responses:
+        contexto_dados += f"- {r['category']}: Nota {r['score']}/5. Ação: {r['action_plan']} | Custo: {r['action_cost']}\n"
+
+    instrucoes = "Aja como Consultor. Escreva o PDTI em formato Markdown com Resumo, Estratégia, Gaps e Plano de Ação."
+    
+    try:
+        # Chama a IA
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=f"{instrucoes}\n\n{contexto_dados}"
+        )
+        pdti_markdown = response.text
+        
+        # 2. Converte o texto Markdown da IA para tags HTML
+        html_from_ia = markdown.markdown(pdti_markdown)
+        
+        # 3. Puxa o seu template HTML de PDF e injeta o conteúdo da IA nele
+        rendered_html = render_template("pdti_pdf_template.html", 
+                                        company_name=assessment['company_name'], 
+                                        score=assessment.get('overall_score', 0),
+                                        content=html_from_ia)
+        
+        # 4. Usa o xhtml2pdf para converter o HTML final em um arquivo PDF
+        pdf_buffer = io.BytesIO()
+        pisa_status = pisa.CreatePDF(
+            io.BytesIO(rendered_html.encode('utf-8')), 
+            dest=pdf_buffer
+        )
+        
+        # Verifica se deu erro na criação do PDF
+        if pisa_status.err:
+            flash("Erro ao desenhar o PDF com xhtml2pdf.")
+            return redirect(url_for('view_assessment', assessment_id=assessment_id))
+            
+        pdf_buffer.seek(0)
+        
+        # 5. Envia o arquivo como um download direto para o navegador!
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"PDTI_{assessment['company_name'].replace(' ', '_')}.pdf"
+        )
+        
+    except Exception as e:
+        flash(f"Erro ao gerar o PDF com IA: {str(e)}")
+        return redirect(url_for('view_assessment', assessment_id=assessment_id))
+    
 @app.route("/assessments/<int:assessment_id>")
 @require_login
 @require_perm("view_reports")
