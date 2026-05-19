@@ -1,6 +1,7 @@
 Flask
-Werkzeug
-python-dotenv
 psycopg2-binary
 google-genai
 xhtml2pdf
+markdown
+python-dotenv
+Werkzeug
