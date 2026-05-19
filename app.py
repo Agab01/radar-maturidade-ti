@@ -10,7 +10,6 @@ from email.message import EmailMessage
 from datetime import datetime, timedelta
 from functools import wraps
 from typing import Dict, Tuple
-from xhtml2pdf import pisa
 from google import genai
 import psycopg2
 from psycopg2.extras import RealDictCursor
