@@ -1,7 +1,6 @@
 Flask
 psycopg2-binary
 google-genai
-xhtml2pdf==0.2.11
 markdown
 python-dotenv
 Werkzeug
