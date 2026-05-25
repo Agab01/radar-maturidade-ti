@@ -953,6 +953,15 @@ REGRA CRÍTICA DE ASSINATURA: O documento foi elaborado por "{nome_avaliador}". 
         
         pdti_text = response.text
         
+        query_db(
+    """
+    UPDATE assessments
+    SET pdti_markdown = %s,
+        pdti_generated_at = NOW()
+    WHERE id = %s
+    """,
+    (pdti_text, assessment_id)
+)
         # 6. Retornar para o frontend
         return jsonify({"status": "success", "pdti": pdti_text})
         
@@ -965,7 +974,6 @@ REGRA CRÍTICA DE ASSINATURA: O documento foi elaborado por "{nome_avaliador}". 
 def download_pdti_pdf(assessment_id):
     from google import genai
     from flask import render_template, redirect, url_for, flash, session
-    # Veja que o 'import markdown' sumiu daqui também!
     
     client = genai.Client()
     assessment = query_db("SELECT a.*, c.name as company_name FROM assessments a JOIN companies c ON a.company_id = c.id WHERE a.id = %s", (assessment_id,), one=True)
@@ -989,207 +997,24 @@ def download_pdti_pdf(assessment_id):
             contexto_dados += f"  Ação: {r['action_plan']} | Por que: {r['action_why']} | Prazo: {r['action_deadline']} | Custo: {r['action_cost']} | Resp: {responsavel}\n"
 
     # A MÁGICA ESTÁ AQUI: Pedindo HTML direto para a IA
-    periodo_pdti = "2026-2028"
-
-    # 4. O Prompt de Sistema (A estrutura do 1º com o conteúdo do 2º)
     instrucoes = f"""
-Você é um Consultor Sênior de Governança de TI, especializado em PDTI, COBIT, ITIL, Segurança da Informação, Gestão de Riscos e Alinhamento Estratégico entre TI e negócio.
+    Você é um Consultor Sênior de Governança de TI. Sua tarefa é ler os dados do diagnóstico de TI e redigir um PDTI (Plano Diretor de Tecnologia da Informação) executivo.
+    
+    REGRAS DE FORMATAÇÃO (CRÍTICO): 
+    Formate sua resposta EXCLUSIVAMENTE em tags HTML válidas (use <h2> para títulos, <p> para textos, <ul> e <li> para listas, <strong> para negritos). 
+    NÃO use formatação Markdown (como ** ou #). 
+    NÃO coloque o texto dentro de blocos de código (como ```html). Retorne apenas o código HTML puro.
+    
+    Estrutura obrigatória:
+    1. Resumo Executivo.
+    2. Alinhamento Estratégico, Governança e Metodologia.
+    3. Principais Gaps e Riscos Encontrados.
+    4. Mapa do Plano de Ação e Cronograma (Apresente em formato de LISTA HTML usando <ul> e <li>, garantindo a exibição de responsáveis, prazos e custos).
+    5. Indicadores de Sucesso (KPIs para medir a evolução do plano).
+    6. Conclusão.
 
-Sua tarefa é ler os dados do diagnóstico de TI e o plano de ação fornecido pela aplicação, e redigir um PDTI — Plano Diretor de Tecnologia da Informação — em formato executivo, formal, claro e profissional.
-
-O período oficial deste PDTI é: {periodo_pdti}.
-Todas as análises, cronogramas e conclusões devem respeitar esse período.
-
-O PDTI deve parecer um documento final de consultoria, pronto para apresentação à diretoria.
-
-REGRAS GERAIS:
-- Formate toda a resposta em Markdown.
-- Seja formal, objetivo e direto.
-- Não invente dados numéricos que não foram fornecidos.
-- Não invente custos, responsáveis, prazos, scores ou percentuais.
-- Quando algum dado não estiver disponível, escreva "Não informado".
-- Pode organizar, reescrever, resumir e melhorar a apresentação dos dados fornecidos.
-- Pode classificar prioridades como Alta, Média ou Baixa com base na criticidade dos riscos e impacto no negócio.
-- Não crie ações novas fora do plano de ação fornecido, a menos que sejam recomendações gerais sem custo, prazo ou responsável inventado.
-- Corrija inconsistências evidentes de escrita, padronização e organização.
-- Caso existam datas muito antigas ou incompatíveis com o período do PDTI, sinalize ou reorganize de forma coerente, sem criar datas aleatórias.
-- Use linguagem consultiva, como se o documento fosse entregue para CEO, CFO, Gerente de TI e demais lideranças.
-
-ESTRUTURA OBRIGATÓRIA DO DOCUMENTO:
-
-# Plano Diretor de Tecnologia da Informação — PDTI
-Informe:
-- Empresa;
-- Período do PDTI: {periodo_pdti};
-- Score atual de maturidade de TI, se fornecido.
-
-## 1. Resumo Executivo
-Explique de forma clara:
-- O objetivo do PDTI;
-- O cenário atual da TI;
-- O score atual, se fornecido;
-- O que esse score representa;
-- As principais fragilidades identificadas;
-- A necessidade de evolução da TI de uma área reativa para uma área estratégica;
-- A relação do plano com os objetivos do negócio.
-
-Se houver score de maturidade, explique que ele foi calculado a partir das dimensões avaliadas no diagnóstico, como governança, processos, segurança da informação, riscos, infraestrutura, gestão de serviços, pessoas, automação e alinhamento estratégico, sem inventar fórmula.
-
-## 2. Alinhamento Estratégico, Governança e Metodologia
-Divida esta seção em três subtópicos:
-
-### 2.1 Alinhamento Estratégico
-Explique como a TI deve se alinhar aos objetivos do negócio, como crescimento, eficiência operacional, redução de riscos, inovação, expansão ou internacionalização, quando essas informações estiverem disponíveis.
-
-### 2.2 Governança de TI
-Explique como a governança será aplicada.
-Recomende a criação ou fortalecimento de mecanismos como:
-- Comitê de Governança de TI;
-- Definição de papéis e responsabilidades;
-- Rituais de acompanhamento;
-- Priorização de projetos por valor de negócio;
-- Indicadores de desempenho;
-- Reporte executivo.
-
-Quando fizer sentido, cite boas práticas baseadas em COBIT, sem aprofundar tecnicamente demais.
-
-### 2.3 Metodologia de Gestão
-Explique a metodologia recomendada para organizar a TI.
-Quando fizer sentido, recomende práticas baseadas em ITIL para:
-- Gestão de incidentes;
-- Requisições;
-- Problemas;
-- Mudanças;
-- Catálogo de serviços;
-- SLAs e OLAs;
-- Melhoria contínua.
-
-Para projetos, mencione abordagem ágil, híbrida ou tradicional, conforme o contexto informado.
-
-## 3. Principais Gaps e Riscos Identificados
-Organize os gaps e riscos por categorias.
-
-Use, sempre que possível, os seguintes grupos:
-
-### 3.1 Gestão de Processos e Operações
-Liste gaps e riscos relacionados a processos, incidentes, mudanças, requisições, documentação e dependência de pessoas.
-
-### 3.2 Infraestrutura, Ferramentas e Automação
-Liste gaps e riscos relacionados a monitoramento, inventário, ativos, ferramentas, automação e infraestrutura.
-
-### 3.3 Gestão de Serviços e Níveis de Atendimento
-Liste gaps e riscos relacionados a SLAs, OLAs, atendimento, previsibilidade, satisfação dos usuários e serviços críticos.
-
-### 3.4 Governança Estratégica e Valor da TI
-Liste gaps e riscos relacionados a alinhamento estratégico, ausência de indicadores, falta de priorização, papéis e responsabilidades.
-
-### 3.5 Segurança da Informação, Riscos e Continuidade
-Liste gaps e riscos relacionados a acessos, backup, continuidade, recuperação de desastres, LGPD, ransomware, controles e gestão de riscos.
-
-### 3.6 Pessoas, Cultura e Competências
-Liste gaps e riscos relacionados a capacitação, dependência de pessoas-chave, compartilhamento de conhecimento, inovação e colaboração.
-
-Em cada categoria, use o formato:
-
-**Gaps identificados:**
-- ...
-
-**Riscos associados:**
-- ...
-
-## 4. Eixos Estratégicos do PDTI
-Crie uma seção explicando que o plano será organizado em eixos estratégicos.
-
-Use os seguintes eixos, se forem compatíveis com os dados:
-
-1. Governança e Alinhamento Estratégico;
-2. Gestão de Serviços de TI;
-3. Segurança da Informação, Riscos e Continuidade;
-4. Infraestrutura, Ferramentas e Automação;
-5. Pessoas, Cultura e Melhoria Contínua.
-
-Não invente eixos desnecessários. Caso algum eixo não tenha ações relacionadas, mantenha apenas os eixos aplicáveis.
-
-## 5. Plano de Ação e Cronograma
-Crie uma tabela em Markdown com as ações do plano.
-
-A tabela deve ter obrigatoriamente as colunas:
-
-| Eixo | Ação | Justificativa | Prazo | Custo Estimado | Responsável | Prioridade |
-
-Regras para a tabela:
-- Use apenas ações fornecidas no plano de ação da aplicação.
-- Não invente custo.
-- Não invente responsável.
-- Não invente prazo.
-- Se algum campo não existir, escreva "Não informado".
-- A justificativa deve explicar o porquê da ação em linguagem executiva.
-- Classifique a prioridade como Alta, Média ou Baixa, considerando impacto, risco e urgência.
-- Agrupe corretamente cada ação dentro do eixo estratégico mais adequado.
-- Padronize os nomes dos responsáveis e ações, mantendo o sentido original.
-
-## 6. Indicadores de Sucesso — KPIs
-Crie uma tabela de KPIs para acompanhar a evolução do PDTI.
-
-A tabela deve ter as colunas:
-
-| Indicador | Meta |
-
-Regras:
-- Se metas numéricas forem fornecidas, utilize exatamente os valores fornecidos.
-- Se não houver metas numéricas, proponha indicadores qualitativos sem inventar percentuais.
-- Os KPIs devem medir evolução em governança, serviços, segurança, riscos, continuidade, disponibilidade, satisfação dos usuários, documentação, automação e entrega de projetos, quando esses temas existirem no diagnóstico.
-- Não invente percentuais, valores financeiros ou prazos específicos sem base nos dados.
-
-Exemplos de indicadores que podem ser usados, se fizerem sentido:
-- Score Geral de Maturidade de TI;
-- Maturidade de Governança de TI;
-- Disponibilidade dos Serviços Críticos;
-- MTTR — Tempo Médio para Restauração;
-- Cumprimento de SLAs;
-- Satisfação dos Usuários — CSAT;
-- Percentual de Processos Documentados;
-- Percentual de Automação de Rotinas;
-- Conformidade com Políticas de Segurança;
-- Testes de Recuperação de Desastres;
-- Projetos Entregues no Prazo e Orçamento;
-- Redução da Dependência de Pessoas-Chave.
-
-## 7. Priorização Geral
-Crie uma seção separando as ações por prioridade.
-
-Use o formato:
-
-### Alta Prioridade
-- ...
-
-### Média Prioridade
-- ...
-
-### Baixa Prioridade
-- ...
-
-A classificação deve ser coerente com os riscos identificados.
-Ações ligadas a segurança, continuidade, governança, processos críticos, gestão de acessos, backup, riscos e serviços essenciais normalmente devem receber prioridade mais alta.
-
-## 8. Conclusão
-Finalize com uma conclusão executiva explicando:
-- A situação atual da TI;
-- A importância da execução do PDTI;
-- Os benefícios esperados;
-- A necessidade de apoio da alta direção;
-- O papel da TI como área estratégica;
-- A importância do acompanhamento contínuo por indicadores.
-
-A conclusão deve ser formal, forte e adequada para fechamento de documento institucional.
-
-IMPORTANTE:
-O resultado final deve conter apenas o PDTI em Markdown.
-Não explique o que você fez.
-Não inclua comentários fora do documento.
-Não use linguagem informal.
-REGRA CRÍTICA DE ASSINATURA: O documento foi elaborado por "{nome_avaliador}". No final da conclusão, você deve assinar EXATAMENTE como: "Consultor: {nome_avaliador}". É terminantemente proibido utilizar colchetes como [Seu Nome] ou [Nome da Empresa].
-"""
+    O documento foi elaborado por "{nome_avaliador}". No final, assine EXATAMENTE como: "Consultor: {nome_avaliador}".
+    """
 
     try:
         response = client.models.generate_content(
