@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from http.client import responses
 import os
 import secrets
 import hashlib
@@ -711,328 +712,734 @@ client = genai.Client()
 @app.route("/assessments/<int:assessment_id>/generate-pdti", methods=["POST"])
 @require_login
 def generate_pdti(assessment_id):
-    from google import genai
-    client = genai.Client()
-    
-    # 1. Buscar os dados da avaliação e da empresa
-    assessment = query_db("SELECT a.*, c.name as company_name FROM assessments a JOIN companies c ON a.company_id = c.id WHERE a.id = %s", (assessment_id,), one=True)
-    
-    responses = query_db("""
-        SELECT q.text as question, q.category, r.score, r.action_plan, r.action_why, r.action_deadline, r.action_cost, r.action_responsible 
-        FROM responses r 
-        JOIN questions q ON r.question_id = q.id 
+
+    assessment = query_db(
+        """
+        SELECT a.*, c.name as company_name
+        FROM assessments a
+        JOIN companies c ON a.company_id = c.id
+        WHERE a.id = %s
+        """,
+        (assessment_id,),
+        one=True
+    )
+
+    if not assessment:
+        return jsonify({
+            "status": "error",
+            "message": "Avaliação não encontrada."
+        }), 404
+
+    responses = query_db(
+    """
+    WITH base AS (
+        SELECT
+            q.text AS question,
+            q.category,
+            r.score,
+            r.evidence,
+
+            r.action_plan,
+            r.action_why,
+            r.action_where,
+            r.action_deadline,
+            r.action_responsible,
+            r.action_how,
+            r.action_cost,
+
+            CASE
+                WHEN r.risk_probability BETWEEN 1 AND 5
+                THEN r.risk_probability
+                WHEN r.score <= 1
+                THEN 4
+                WHEN r.score = 2
+                THEN 3
+                WHEN r.score = 3
+                THEN 2
+                ELSE 1
+            END AS risk_probability_effective,
+
+            CASE
+                WHEN r.risk_impact BETWEEN 1 AND 5
+                THEN r.risk_impact
+                WHEN q.category ILIKE '%%segurança%%'
+                  OR q.category ILIKE '%%conformidade%%'
+                  OR q.category ILIKE '%%risco%%'
+                  OR q.category ILIKE '%%continuidade%%'
+                  OR q.category ILIKE '%%governança%%'
+                THEN 5
+                WHEN r.score <= 1
+                THEN 4
+                WHEN r.score = 2
+                THEN 4
+                WHEN r.score = 3
+                THEN 3
+                ELSE 2
+            END AS risk_impact_effective,
+
+            CASE
+                WHEN r.risk_probability BETWEEN 1 AND 5
+                 AND r.risk_impact BETWEEN 1 AND 5
+                THEN 'Informado no diagnóstico'
+                ELSE 'Estimado automaticamente com base na nota de maturidade e no domínio avaliado'
+            END AS risk_origin
+
+        FROM responses r
+        JOIN questions q ON r.question_id = q.id
         WHERE r.assessment_id = %s
-    """, (assessment_id,))
-    
-    # 2. Puxa o nome do avaliador (com trava de segurança)
+    )
+
+    SELECT
+        question,
+        category,
+        score,
+        evidence,
+
+        action_plan,
+        action_why,
+        action_where,
+        action_deadline,
+        action_responsible,
+        action_how,
+        action_cost,
+
+        risk_probability_effective AS risk_probability,
+        risk_impact_effective AS risk_impact,
+        risk_probability_effective * risk_impact_effective AS risk_score,
+
+        CASE
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 1 AND 5
+            THEN 'Baixo'
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 6 AND 10
+            THEN 'Moderado'
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 11 AND 15
+            THEN 'Alto'
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 16 AND 25
+            THEN 'Crítico'
+            ELSE 'Não informado'
+        END AS risk_classification,
+
+        CASE
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 20 AND 25
+            THEN 'Altíssima'
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 16 AND 19
+            THEN 'Alta'
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 11 AND 15
+            THEN 'Média'
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 6 AND 10
+            THEN 'Baixa'
+            ELSE 'Baixa'
+        END AS action_priority,
+
+        CASE
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 20 AND 25
+            THEN 1
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 16 AND 19
+            THEN 2
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 11 AND 15
+            THEN 3
+            WHEN risk_probability_effective * risk_impact_effective BETWEEN 6 AND 10
+            THEN 4
+            ELSE 5
+        END AS priority_order,
+
+        risk_origin
+
+    FROM base
+    ORDER BY
+        priority_order ASC,
+        risk_probability_effective * risk_impact_effective DESC,
+        action_deadline ASC,
+        category ASC
+    """,
+    (assessment_id,)
+)
+
     nome_avaliador = session.get("user_name")
     if not nome_avaliador or nome_avaliador.strip() == "":
-        nome_avaliador = "Consultoria Radar.TI" # Nome de fallback caso a sessão falhe
-    
-    # 3. Montar o Contexto
-    contexto_dados = f"Empresa: {assessment['company_name']}\nScore Geral Atual: {assessment.get('overall_score', 0)}%\n\nDETALHES DO DIAGNÓSTICO:\n"
-    for r in responses:
-        responsavel = r.get('action_responsible') or 'A definir'
-        contexto_dados += f"- Domínio: {r['category']} | Quesito: {r['question']}\n"
-        contexto_dados += f"  Nota: {r['score']}/5\n"
-        if r['action_plan']:
-            contexto_dados += f"  Ação Planejada: {r['action_plan']} | Por que: {r['action_why']} | Prazo: {r['action_deadline']} | Custo: {r['action_cost']} | Responsável: {responsavel}\n"
-        contexto_dados += "\n"
-
+        nome_avaliador = "Consultoria Radar.TI"
 
     periodo_pdti = "2026-2028"
 
-    # 4. O Prompt de Sistema (A estrutura do 1º com o conteúdo do 2º)
-    instrucoes = f"""
-Você é um Consultor Sênior de Governança de TI, especializado em PDTI, COBIT, ITIL, Segurança da Informação, Gestão de Riscos e Alinhamento Estratégico entre TI e negócio.
+    score_atual = float(assessment.get("overall_score") or 0)
 
-Sua tarefa é ler os dados do diagnóstico de TI e o plano de ação fornecido pela aplicação, e redigir um PDTI — Plano Diretor de Tecnologia da Informação — em formato executivo, formal, claro e profissional.
+    classificacao_maturidade = assessment.get("maturity_level")
+
+    if not classificacao_maturidade or str(classificacao_maturidade).strip() == "":
+        classificacao_maturidade, classe_maturidade, descricao_maturidade = maturity_from_score(score_atual)
+    else:
+         _, classe_maturidade, descricao_maturidade = maturity_from_score(score_atual)
+
+    contexto_dados = f"""
+Empresa: {assessment["company_name"]}
+Score Geral Atual: {assessment.get("overall_score", 0)}%
+Classificação de Maturidade: {classificacao_maturidade}
+Descrição da Maturidade: {descricao_maturidade}
+Período do PDTI: {periodo_pdti}
+Consultor/Avaliador: {nome_avaliador}
+
+DETALHES DO DIAGNÓSTICO, EVIDÊNCIAS, RISCOS E PLANO DE AÇÃO 5W2H:
+"""
+
+    for r in responses:
+        contexto_dados += f"""
+DOMÍNIO: {r.get("category") or "Não informado"}
+QUESITO AVALIADO: {r.get("question") or "Não informado"}
+NOTA DE MATURIDADE: {r.get("score") if r.get("score") is not None else "Não informado"}/5
+EVIDÊNCIA REGISTRADA: {r.get("evidence") or "Não informado"}
+
+RISCO:
+Probabilidade (P): {r.get("risk_probability") if r.get("risk_probability") is not None else "Não informado"}
+Impacto (I): {r.get("risk_impact") if r.get("risk_impact") is not None else "Não informado"}
+Score do Risco (S = P x I): {r.get("risk_score") if r.get("risk_score") is not None else "Não informado"}
+Classificação do Risco: {r.get("risk_classification") or "Não informado"}
+Prioridade Obrigatória da Ação: {r.get("action_priority") or "Não informado"}
+Origem da avaliação de risco: {r.get("risk_origin") or "Não informado"}
+
+PLANO DE AÇÃO 5W2H:
+Prioridade: {r.get("action_priority") or "Não informado"}
+Risco Mitigado: {r.get("risk_classification") or "Não informado"} - Score {r.get("risk_score") if r.get("risk_score") is not None else "Não informado"}
+What: {r.get("action_plan") or "Não informado"}
+Why: {r.get("action_why") or "Não informado"}
+Where: {r.get("action_where") or "Não informado"}
+When: {r.get("action_deadline") or "Não informado"}
+Who: {r.get("action_responsible") or "Não informado"}
+How: {r.get("action_how") or "Não informado"}
+How Much: {r.get("action_cost") or "Não informado"}
+"""
+
+    instrucoes = f"""
+Você é um Consultor Sênior de Governança de TI, especializado em PDTI, COBIT, ITIL, ISO 27001, LGPD, Gestão de Riscos, Gestão de Serviços e Planejamento Estratégico de TI.
+
+Sua tarefa é gerar um PDTI — Plano Diretor de Tecnologia da Informação — a partir dos dados do diagnóstico corporativo, da matriz de maturidade, dos riscos identificados e do plano de ação 5W2H fornecidos pela aplicação.
 
 O período oficial deste PDTI é: {periodo_pdti}.
-Todas as análises, cronogramas e conclusões devem respeitar esse período.
+Todas as análises, cronogramas, metas e ações devem respeitar esse período.
 
-O PDTI deve parecer um documento final de consultoria, pronto para apresentação à diretoria.
+O documento deve ser formal, executivo, técnico e aderente a um trabalho acadêmico de Governança de TI.
+
+REGRA CRÍTICA:
+A saída NÃO pode ser apenas conceitual.
+É obrigatório gerar tabelas estruturadas para SWOT, matriz de riscos, plano de ação 5W2H, KPIs, CAPEX/OPEX e Curva S.
+É proibido substituir essas tabelas por texto corrido.
+
+REGRA CRÍTICA SOBRE RISCOS:
+É proibido gerar riscos críticos com Probabilidade 0, Impacto 0 ou Score 0.
+A escala válida de Probabilidade e Impacto é obrigatoriamente de 1 a 5.
+Quando a aplicação fornecer Probabilidade, Impacto, Score e Classificação, use exatamente esses valores.
+Quando a aplicação informar que o risco foi estimado automaticamente, mantenha os valores estimados e informe na justificativa que a pontuação foi derivada da nota de maturidade e do domínio avaliado.
+Quando houver gap com nota 0, 1 ou 2, ele deve obrigatoriamente aparecer na matriz de riscos com score maior que zero.
+Nunca use Score 0 para representar ausência de avaliação. Use "Não informado" apenas quando realmente não houver dados suficientes, mas não para gaps críticos.
+
+REGRA CRÍTICA SOBRE PRIORIDADE:
+A prioridade da ação deve ser definida pelo Score de Risco, e não apenas pelo prazo.
+Use obrigatoriamente o campo "Prioridade Obrigatória da Ação" fornecido no contexto.
+É proibido rebaixar uma ação de risco crítico para prioridade "Baixa".
+Riscos com Score entre 20 e 25 devem aparecer como prioridade "Altíssima".
+Riscos com Score entre 16 e 19 devem aparecer como prioridade "Alta".
+Riscos com Score entre 11 e 15 devem aparecer como prioridade "Média".
+Riscos com Score abaixo de 11 podem aparecer como prioridade "Baixa".
+A mesma prioridade deve ser preservada no Plano de Ação 5W2H e no Plano Diretor de Ações Estratégicas.
 
 REGRAS GERAIS:
 - Formate toda a resposta em Markdown.
-- Seja formal, objetivo e direto.
-- Não invente dados numéricos que não foram fornecidos.
-- Não invente custos, responsáveis, prazos, scores ou percentuais.
-- Quando algum dado não estiver disponível, escreva "Não informado".
-- Pode organizar, reescrever, resumir e melhorar a apresentação dos dados fornecidos.
-- Pode classificar prioridades como Alta, Média ou Baixa com base na criticidade dos riscos e impacto no negócio.
-- Não crie ações novas fora do plano de ação fornecido, a menos que sejam recomendações gerais sem custo, prazo ou responsável inventado.
-- Corrija inconsistências evidentes de escrita, padronização e organização.
-- Caso existam datas muito antigas ou incompatíveis com o período do PDTI, sinalize ou reorganize de forma coerente, sem criar datas aleatórias.
-- Use linguagem consultiva, como se o documento fosse entregue para CEO, CFO, Gerente de TI e demais lideranças.
+- Não use HTML.
+- Não use bloco de código Markdown.
+- Não invente dados numéricos sem base.
+- Quando houver dados numéricos no diagnóstico, utilize-os obrigatoriamente.
+- Quando algum dado não for fornecido, escreva "Não informado".
+- Pode inferir classificação qualitativa quando necessário, desde que com base nos dados fornecidos.
+- Não invente responsáveis, custos ou prazos.
+- Preserve as ações 5W2H fornecidas pela aplicação.
+- Não simplifique o plano de ação em lista comum.
+- Não transforme 5W2H em texto corrido.
+- Não omita riscos críticos.
+- Não omita KPIs quantitativos quando houver valores atuais e metas disponíveis.
+- Use linguagem consultiva, formal e objetiva.
+- O documento deve demonstrar ligação lógica entre diagnóstico, SWOT, riscos, plano de ação e indicadores.
 
-ESTRUTURA OBRIGATÓRIA DO DOCUMENTO:
+ESTRUTURA OBRIGATÓRIA DO PDTI:
 
 # Plano Diretor de Tecnologia da Informação — PDTI
-Informe:
+
+Informe obrigatoriamente:
 - Empresa;
 - Período do PDTI: {periodo_pdti};
-- Score atual de maturidade de TI, se fornecido.
+- Score geral de maturidade de TI;
+- Classificação de maturidade, se fornecida;
+- Avaliador ou consultor responsável.
 
-## 1. Resumo Executivo
-Explique de forma clara:
+## 1. Introdução
+
+Apresente:
 - O objetivo do PDTI;
-- O cenário atual da TI;
-- O score atual, se fornecido;
-- O que esse score representa;
-- As principais fragilidades identificadas;
-- A necessidade de evolução da TI de uma área reativa para uma área estratégica;
-- A relação do plano com os objetivos do negócio.
+- O contexto da organização;
+- A importância da TI para a estratégia do negócio;
+- A relação entre o PDTI, a governança corporativa e os objetivos estratégicos da empresa;
+- A necessidade de alinhar tecnologia, riscos, controles, investimentos e geração de valor.
 
-Se houver score de maturidade, explique que ele foi calculado a partir das dimensões avaliadas no diagnóstico, como governança, processos, segurança da informação, riscos, infraestrutura, gestão de serviços, pessoas, automação e alinhamento estratégico, sem inventar fórmula.
+## 2. Análise Situacional — SWOT
 
-## 2. Alinhamento Estratégico, Governança e Metodologia
-Divida esta seção em três subtópicos:
+Crie obrigatoriamente uma matriz SWOT em tabela Markdown.
 
-### 2.1 Alinhamento Estratégico
-Explique como a TI deve se alinhar aos objetivos do negócio, como crescimento, eficiência operacional, redução de riscos, inovação, expansão ou internacionalização, quando essas informações estiverem disponíveis.
+A tabela deve ter exatamente esta estrutura:
 
-### 2.2 Governança de TI
-Explique como a governança será aplicada.
-Recomende a criação ou fortalecimento de mecanismos como:
-- Comitê de Governança de TI;
-- Definição de papéis e responsabilidades;
-- Rituais de acompanhamento;
-- Priorização de projetos por valor de negócio;
-- Indicadores de desempenho;
-- Reporte executivo.
+| Forças | Fraquezas |
+|---|---|
+| ... | ... |
 
-Quando fizer sentido, cite boas práticas baseadas em COBIT, sem aprofundar tecnicamente demais.
+| Oportunidades | Ameaças |
+|---|---|
+| ... | ... |
 
-### 2.3 Metodologia de Gestão
-Explique a metodologia recomendada para organizar a TI.
-Quando fizer sentido, recomende práticas baseadas em ITIL para:
-- Gestão de incidentes;
-- Requisições;
-- Problemas;
-- Mudanças;
-- Catálogo de serviços;
-- SLAs e OLAs;
-- Melhoria contínua.
+Regras:
+- As Forças devem vir de evidências positivas do diagnóstico.
+- As Fraquezas devem vir de notas baixas, processos inexistentes, falhas operacionais e lacunas de governança.
+- As Oportunidades devem estar relacionadas a melhoria de governança, automação, integração, segurança, conformidade, eficiência e valor de negócio.
+- As Ameaças devem estar relacionadas a riscos regulatórios, financeiros, operacionais, segurança da informação, continuidade, LGPD, perda de confiança e indisponibilidade.
+- Não invente fatos externos.
+- A SWOT precisa servir de ponte entre o diagnóstico e o plano de ação.
 
-Para projetos, mencione abordagem ágil, híbrida ou tradicional, conforme o contexto informado.
+## 3. Diagnóstico Situacional
 
-## 3. Principais Gaps e Riscos Identificados
-Organize os gaps e riscos por categorias.
+Apresente uma análise do diagnóstico de maturidade.
 
-Use, sempre que possível, os seguintes grupos:
+Inclua obrigatoriamente:
+- Score geral atual;
+- Interpretação do score;
+- Principais domínios avaliados;
+- Domínios com maior fragilidade;
+- Gaps críticos identificados;
+- Relação entre os gaps e o cenário operacional da empresa.
 
-### 3.1 Gestão de Processos e Operações
-Liste gaps e riscos relacionados a processos, incidentes, mudanças, requisições, documentação e dependência de pessoas.
+Organize os gaps por domínio em uma tabela:
 
-### 3.2 Infraestrutura, Ferramentas e Automação
-Liste gaps e riscos relacionados a monitoramento, inventário, ativos, ferramentas, automação e infraestrutura.
+| Domínio | Quesito Avaliado | Nota | Gap Identificado | Consequência para o Negócio |
+|---|---:|---:|---|---|
 
-### 3.3 Gestão de Serviços e Níveis de Atendimento
-Liste gaps e riscos relacionados a SLAs, OLAs, atendimento, previsibilidade, satisfação dos usuários e serviços críticos.
+Regras:
+- Utilize as notas fornecidas.
+- Dê destaque para notas 0, 1 e 2.
+- Não omita domínios críticos.
+- Conecte cada gap ao impacto no negócio.
 
-### 3.4 Governança Estratégica e Valor da TI
-Liste gaps e riscos relacionados a alinhamento estratégico, ausência de indicadores, falta de priorização, papéis e responsabilidades.
+## 4. Análise de Riscos
 
-### 3.5 Segurança da Informação, Riscos e Continuidade
-Liste gaps e riscos relacionados a acessos, backup, continuidade, recuperação de desastres, LGPD, ransomware, controles e gestão de riscos.
+Esta seção é obrigatória e deve conter uma MATRIZ NUMÉRICA DE RISCOS.
 
-### 3.6 Pessoas, Cultura e Competências
-Liste gaps e riscos relacionados a capacitação, dependência de pessoas-chave, compartilhamento de conhecimento, inovação e colaboração.
+Use obrigatoriamente a regra:
 
-Em cada categoria, use o formato:
+S = P × I
 
-**Gaps identificados:**
-- ...
+Onde:
+- S = Score de Risco;
+- P = Probabilidade;
+- I = Impacto.
 
-**Riscos associados:**
-- ...
+Escala:
+- Probabilidade: 1 a 5;
+- Impacto: 1 a 5;
+- Score máximo: 25.
 
-## 4. Eixos Estratégicos do PDTI
-Crie uma seção explicando que o plano será organizado em eixos estratégicos.
+Classificação:
+- 1 a 5 = Baixo;
+- 6 a 10 = Moderado;
+- 11 a 15 = Alto;
+- 16 a 25 = Crítico.
 
-Use os seguintes eixos, se forem compatíveis com os dados:
+Crie obrigatoriamente a tabela:
 
+| ID | Domínio | Risco Identificado | Probabilidade (P) | Impacto (I) | Score S = P x I | Classificação | Evidência/Justificativa | Ação Mitigadora |
+|---|---|---|---:|---:|---:|---|---|---|
+
+Regras:
+- Use obrigatoriamente os valores de Probabilidade, Impacto, Score e Classificação fornecidos no contexto.
+- Não recalcule nem substitua os valores recebidos.
+- É proibido usar P = 0, I = 0 ou Score = 0.
+- Se a origem do risco for "Estimado automaticamente com base na nota de maturidade e no domínio avaliado", informe isso na coluna de Evidência/Justificativa.
+- Todos os gaps com nota 0, 1 ou 2 devem aparecer na matriz de riscos.
+- Riscos de segurança da informação, continuidade, acesso, backup, indisponibilidade, LGPD, auditoria, governança, ativos, mudanças e serviços críticos devem aparecer quando existirem no diagnóstico.
+- Não apresente apenas Top 3 riscos. Apresente uma matriz de riscos compatível com os gaps críticos.
+- Ordene os riscos do maior score para o menor.
+
+Após a tabela, escreva um parágrafo explicando quais riscos exigem mitigação imediata nos primeiros 90 dias.
+
+## 5. Plano de Ação dos Primeiros 90 Dias — 5W2H
+
+Esta seção é obrigatória.
+
+REGRA OBRIGATÓRIA DE PRIORIDADE:
+A coluna "Prioridade" do plano 5W2H deve copiar exatamente o campo "Prioridade" recebido em cada PLANO DE AÇÃO 5W2H.
+
+É proibido recalcular, reinterpretar ou alterar a prioridade.
+
+Riscos com classificação "Crítico" jamais podem aparecer como prioridade "Baixa" ou "Média".
+
+Use obrigatoriamente:
+- Score 20 a 25: Altíssima
+- Score 16 a 19: Alta
+- Score 11 a 15: Média
+- Score 6 a 10: Baixa
+- Score 1 a 5: Baixa
+
+Crie uma tabela 5W2H com ações priorizadas para os primeiros 90 dias.
+
+A tabela deve ter exatamente as colunas:
+
+| Prioridade | Risco Mitigado | What | Why | Where | When | Who | How | How Much |
+|---|---|---|---|---|---|---|---|---|
+
+Regras:
+- Use as ações fornecidas no plano de ação da aplicação.
+- Preserve os campos What, Why, Where, When, Who, How e How Much.
+- Não transforme o 5W2H em lista.
+- Não omita custo, prazo ou responsável quando forem fornecidos.
+- Se algum campo não existir, escreva "Não informado".
+- Priorize ações com prazo dentro dos primeiros 90 dias.
+- Ações ligadas a riscos críticos devem aparecer primeiro.
+- Cada ação precisa estar conectada a um risco mitigado.
+- O campo "Risco Mitigado" deve apontar claramente qual risco da matriz está sendo tratado.
+- A coluna "Prioridade" deve usar exatamente o valor informado em "Prioridade Obrigatória da Ação".
+- Nunca classifique como "Baixa" uma ação cujo risco mitigado tenha classificação "Crítico".
+- Ordene as ações por prioridade: Altíssima, Alta, Média e Baixa.
+
+## 6. Plano Diretor de Ações Estratégicas — 2026-2028
+
+Depois do plano de 90 dias, apresente o roadmap geral do PDTI para o período completo.
+
+Use a tabela:
+
+| Eixo Estratégico | Ação | Justificativa | Prazo | Responsável | Custo Estimado | Prioridade |
+|---|---|---|---|---|---|---|
+
+Eixos recomendados:
 1. Governança e Alinhamento Estratégico;
 2. Gestão de Serviços de TI;
 3. Segurança da Informação, Riscos e Continuidade;
 4. Infraestrutura, Ferramentas e Automação;
-5. Pessoas, Cultura e Melhoria Contínua.
+5. Dados, Integração e Sistemas;
+6. Pessoas, Cultura e Melhoria Contínua.
 
-Não invente eixos desnecessários. Caso algum eixo não tenha ações relacionadas, mantenha apenas os eixos aplicáveis.
 
-## 5. Plano de Ação e Cronograma
-Crie uma tabela em Markdown com as ações do plano.
-
-A tabela deve ter obrigatoriamente as colunas:
-
-| Eixo | Ação | Justificativa | Prazo | Custo Estimado | Responsável | Prioridade |
-
-Regras para a tabela:
-- Use apenas ações fornecidas no plano de ação da aplicação.
-- Não invente custo.
-- Não invente responsável.
-- Não invente prazo.
-- Se algum campo não existir, escreva "Não informado".
-- A justificativa deve explicar o porquê da ação em linguagem executiva.
-- Classifique a prioridade como Alta, Média ou Baixa, considerando impacto, risco e urgência.
-- Agrupe corretamente cada ação dentro do eixo estratégico mais adequado.
-- Padronize os nomes dos responsáveis e ações, mantendo o sentido original.
-
-## 6. Indicadores de Sucesso — KPIs
-Crie uma tabela de KPIs para acompanhar a evolução do PDTI.
-
-A tabela deve ter as colunas:
-
-| Indicador | Meta |
+REGRA OBRIGATÓRIA DE PRIORIDADE:
+A prioridade no Plano Diretor de Ações Estratégicas deve ser igual à prioridade informada no bloco PLANO DE AÇÃO 5W2H.
+Não use o prazo para rebaixar prioridades.
+Não classifique como "Baixa" ações ligadas a riscos críticos.
 
 Regras:
-- Se metas numéricas forem fornecidas, utilize exatamente os valores fornecidos.
-- Se não houver metas numéricas, proponha indicadores qualitativos sem inventar percentuais.
-- Os KPIs devem medir evolução em governança, serviços, segurança, riscos, continuidade, disponibilidade, satisfação dos usuários, documentação, automação e entrega de projetos, quando esses temas existirem no diagnóstico.
-- Não invente percentuais, valores financeiros ou prazos específicos sem base nos dados.
+- Use apenas ações existentes no plano de ação.
+- Não invente novas ações.
+- Classifique prioridade como Alta, Média ou Baixa.
+- A justificativa deve relacionar a ação ao gap, risco ou objetivo estratégico correspondente.
+- A prioridade da ação deve ser igual à "Prioridade Obrigatória da Ação" recebida no contexto.
+- Não altere a prioridade com base apenas no prazo ou no custo.
+- Risco crítico nunca pode gerar prioridade Baixa.
 
-Exemplos de indicadores que podem ser usados, se fizerem sentido:
-- Score Geral de Maturidade de TI;
-- Maturidade de Governança de TI;
-- Disponibilidade dos Serviços Críticos;
-- MTTR — Tempo Médio para Restauração;
-- Cumprimento de SLAs;
-- Satisfação dos Usuários — CSAT;
-- Percentual de Processos Documentados;
-- Percentual de Automação de Rotinas;
-- Conformidade com Políticas de Segurança;
-- Testes de Recuperação de Desastres;
-- Projetos Entregues no Prazo e Orçamento;
-- Redução da Dependência de Pessoas-Chave.
+## 7. Viabilidade Financeira — CAPEX e OPEX
 
-## 7. Priorização Geral
-Crie uma seção separando as ações por prioridade.
+Esta seção é obrigatória.
 
-Use o formato:
+Classifique os custos das ações entre CAPEX e OPEX.
 
-### Alta Prioridade
-- ...
+Use a tabela:
 
-### Média Prioridade
-- ...
+| Ação | Tipo de Gasto | Valor Estimado | Justificativa da Classificação |
+|---|---|---:|---|
 
-### Baixa Prioridade
-- ...
+Critérios:
+- CAPEX = investimento em aquisição, implantação, infraestrutura, sistemas, consultoria de implantação, integração ou ativo tecnológico.
+- OPEX = despesa recorrente, mensalidade, SaaS, suporte, operação, treinamento recorrente ou serviço contínuo.
+- Se o custo informado for "R$ 0,00", "0", "0,00", "-", ou indicar ausência de custo direto, classifique o Tipo de Gasto como "Sem custo direto".
+- Para ações sem custo direto, a justificativa deve explicar que se trata de ação interna, administrativa, processual, de governança ou organizacional.
+- Não use "Não informado" quando o valor estiver claramente indicado como R$ 0,00.
+- Use "Não informado" apenas quando realmente não houver dado de custo.
+- Não invente valores.
+- Se o custo for mensal, mantenha como mensal.
+- Se o custo for único, mantenha como único.
 
-A classificação deve ser coerente com os riscos identificados.
-Ações ligadas a segurança, continuidade, governança, processos críticos, gestão de acessos, backup, riscos e serviços essenciais normalmente devem receber prioridade mais alta.
+Depois da tabela, apresente um resumo:
 
-## 8. Conclusão
-Finalize com uma conclusão executiva explicando:
-- A situação atual da TI;
-- A importância da execução do PDTI;
-- Os benefícios esperados;
-- A necessidade de apoio da alta direção;
-- O papel da TI como área estratégica;
-- A importância do acompanhamento contínuo por indicadores.
+| Total CAPEX Identificado | Total OPEX Mensal Identificado | Observação |
+|---:|---:|---|
 
-A conclusão deve ser formal, forte e adequada para fechamento de documento institucional.
+Regras:
+- Some apenas valores claramente numéricos.
+- Não some valores ambíguos.
+- Quando não for possível somar, escreva "Não consolidado por ausência de dados padronizados".
+
+## 8. Curva S Financeira e Técnica
+
+Esta seção é obrigatória.
+
+Apresente uma Curva S simplificada em tabela, dividindo as ações por horizonte de execução.
+
+Use a tabela:
+
+| Fase | Período | Foco Técnico | Ações Principais | Investimento Previsto | Resultado Esperado |
+|---|---|---|---|---|---|
+
+Fases obrigatórias:
+- Fase 1 — Estabilização: 0 a 90 dias;
+- Fase 2 — Estruturação: 3 a 12 meses;
+- Fase 3 — Otimização: 12 a 36 meses.
+
+Regras:
+- A Fase 1 deve conter ações críticas de risco, continuidade, acessos, backup, governança e monitoramento.
+- A Fase 2 deve conter ações de estruturação de processos, ITSM, ITIL, SLAs, KPIs e integração.
+- A Fase 3 deve conter ações de maturidade, automação, inovação, melhoria contínua e otimização.
+- Não invente ações.
+- O investimento previsto deve usar os custos fornecidos.
+- Se não houver custo consolidado, escreva "Conforme plano de ação".
+
+## 9. Indicadores de Sucesso — KPIs Quantitativos
+
+Esta seção é obrigatória.
+
+Crie uma tabela com indicadores operacionais quantitativos.
+
+Use exatamente esta estrutura:
+
+| Indicador | Situação Atual | Meta | Prazo de Acompanhamento | Fonte de Medição |
+|---|---:|---:|---|---|
+
+Regras:
+- Use valores atuais e metas quando eles aparecerem no diagnóstico, evidências, plano de ação ou texto do quesito.
+- Não invente valores atuais.
+- Caso o valor atual não exista, escreva "Baseline a coletar nos primeiros 30 dias".
+- Caso a meta não exista, defina uma meta operacional mensurável apenas quando ela decorrer diretamente da ação proposta.
+- Quando a ação for implantação de ITSM, utilize indicadores como percentual de chamados registrados no ITSM, cumprimento de SLA e MTTR.
+- Quando a ação for backup/DRP, utilize indicadores como sucesso em testes de restauração, periodicidade dos testes e RPO/RTO, se informados.
+- Quando a ação for controle de acessos, utilize indicadores como percentual de contas revisadas, contas órfãs removidas, usuários com MFA e acessos recertificados.
+- Quando a ação for inventário, utilize percentual de ativos inventariados.
+- Quando a ação for governança, utilize percentual de ações reportadas ao comitê, percentual de riscos acompanhados e percentual de projetos priorizados por critério formal.
+- Quando a ação for integração ou automação, utilize percentual de processos automatizados ou integrações implantadas.
+- Inclua obrigatoriamente indicadores operacionais, não apenas indicadores conceituais.
+
+## 10. Governança de Acompanhamento e Controle
+
+Explique como o PDTI será acompanhado.
+
+Inclua:
+- Comitê responsável;
+- Periodicidade de revisão;
+- Forma de reporte;
+- Responsáveis por atualizar indicadores;
+- Como riscos e ações serão acompanhados;
+- Como a alta direção validará o progresso.
+
+Use uma tabela:
+
+| Mecanismo de Controle | Periodicidade | Responsável | Evidência Esperada |
+|---|---|---|---|
+
+## 11. Conclusão
+
+Finalize com uma conclusão executiva.
+
+A conclusão deve:
+- Retomar o cenário atual;
+- Reforçar a necessidade de estabilização da governança;
+- Destacar os riscos mais críticos;
+- Relacionar o plano de 90 dias com a mitigação imediata;
+- Reforçar a importância da matriz de riscos;
+- Reforçar a importância dos KPIs quantitativos;
+- Destacar a necessidade de apoio da alta direção;
+- Apontar a evolução esperada da TI como área estratégica.
 
 IMPORTANTE:
 O resultado final deve conter apenas o PDTI em Markdown.
 Não explique o que você fez.
 Não inclua comentários fora do documento.
 Não use linguagem informal.
-REGRA CRÍTICA DE ASSINATURA: O documento foi elaborado por "{nome_avaliador}". No final da conclusão, você deve assinar EXATAMENTE como: "Consultor: {nome_avaliador}". É terminantemente proibido utilizar colchetes como [Seu Nome] ou [Nome da Empresa].
+
+REGRA CRÍTICA DE ASSINATURA:
+O documento foi elaborado por "{nome_avaliador}".
+No final da conclusão, assine exatamente como:
+Consultor: {nome_avaliador}
+É proibido usar [Seu Nome], [Nome da Empresa] ou qualquer placeholder.
 """
 
     try:
-        # 5. Chamar a API do Gemini
         prompt_completo = f"{instrucoes}\n\n--- DADOS DA EMPRESA ---\n{contexto_dados}"
-        
+
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model="gemini-2.5-flash",
             contents=prompt_completo
         )
-        
-        pdti_text = response.text
-        
-        query_db(
-    """
-    UPDATE assessments
-    SET pdti_markdown = %s,
-        pdti_generated_at = NOW()
-    WHERE id = %s
-    """,
-    (pdti_text, assessment_id)
-)
-        # 6. Retornar para o frontend
-        return jsonify({"status": "success", "pdti": pdti_text})
-        
+
+        pdti_text = response.text or ""
+        pdti_text = (
+            pdti_text
+            .replace("```markdown", "")
+            .replace("```md", "")
+            .replace("```", "")
+            .strip()
+        )
+
+        execute_db(
+            """
+            UPDATE assessments
+            SET pdti_markdown = %s,
+                pdti_generated_at = NOW()
+            WHERE id = %s
+            """,
+            (pdti_text, assessment_id)
+        )
+
+        return jsonify({
+            "status": "success",
+            "pdti": pdti_text
+        })
+
     except Exception as e:
         print(f"Erro na IA: {e}", flush=True)
-        return jsonify({"status": "error", "message": str(e)}), 500
-    
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        }), 500
+
+
 @app.route("/assessments/<int:assessment_id>/download-pdti", methods=["GET"])
 @require_login
 def download_pdti_pdf(assessment_id):
-    from google import genai
-    from flask import render_template, redirect, url_for, flash, session
-    
-    client = genai.Client()
-    assessment = query_db("SELECT a.*, c.name as company_name FROM assessments a JOIN companies c ON a.company_id = c.id WHERE a.id = %s", (assessment_id,), one=True)
-    
-    responses = query_db("""
-        SELECT q.text as question, q.category, r.score, r.action_plan, r.action_why, r.action_deadline, r.action_cost, r.action_responsible 
-        FROM responses r 
-        JOIN questions q ON r.question_id = q.id 
-        WHERE r.assessment_id = %s
-    """, (assessment_id,))
-    
-    nome_avaliador = session.get("user_name")
-    if not nome_avaliador or nome_avaliador.strip() == "":
-        nome_avaliador = "Consultoria Radar.TI"
-    
-    contexto_dados = f"Empresa: {assessment['company_name']}\nScore Geral Atual: {assessment.get('overall_score', 0)}%\n\nDETALHES DO DIAGNÓSTICO:\n"
-    for r in responses:
-        responsavel = r.get('action_responsible') or 'A definir'
-        contexto_dados += f"- Domínio: {r['category']} | Quesito: {r['question']}\n  Nota: {r['score']}/5\n"
-        if r['action_plan']:
-            contexto_dados += f"  Ação: {r['action_plan']} | Por que: {r['action_why']} | Prazo: {r['action_deadline']} | Custo: {r['action_cost']} | Resp: {responsavel}\n"
+    from flask import render_template, redirect, url_for, flash
+    import html
+    import re
 
-    # A MÁGICA ESTÁ AQUI: Pedindo HTML direto para a IA
-    instrucoes = f"""
-    Você é um Consultor Sênior de Governança de TI. Sua tarefa é ler os dados do diagnóstico de TI e redigir um PDTI (Plano Diretor de Tecnologia da Informação) executivo.
-    
-    REGRAS DE FORMATAÇÃO (CRÍTICO): 
-    Formate sua resposta EXCLUSIVAMENTE em tags HTML válidas (use <h2> para títulos, <p> para textos, <ul> e <li> para listas, <strong> para negritos). 
-    NÃO use formatação Markdown (como ** ou #). 
-    NÃO coloque o texto dentro de blocos de código (como ```html). Retorne apenas o código HTML puro.
-    
-    Estrutura obrigatória:
-    1. Resumo Executivo.
-    2. Alinhamento Estratégico, Governança e Metodologia.
-    3. Principais Gaps e Riscos Encontrados.
-    4. Mapa do Plano de Ação e Cronograma (Apresente em formato de LISTA HTML usando <ul> e <li>, garantindo a exibição de responsáveis, prazos e custos).
-    5. Indicadores de Sucesso (KPIs para medir a evolução do plano).
-    6. Conclusão.
+    def markdown_para_html_basico(markdown_text):
+        def inline_format(text):
+            text = html.escape(text)
+            text = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", text)
+            text = re.sub(r"\*(.*?)\*", r"<em>\1</em>", text)
+            return text
 
-    O documento foi elaborado por "{nome_avaliador}". No final, assine EXATAMENTE como: "Consultor: {nome_avaliador}".
-    """
+        def parse_table(lines, start_index):
+            table_lines = []
+            i = start_index
+
+            while i < len(lines) and lines[i].strip().startswith("|"):
+                table_lines.append(lines[i].strip())
+                i += 1
+
+            if len(table_lines) < 2:
+                return None, start_index
+
+            separator = table_lines[1]
+            if not re.match(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$", separator):
+                return None, start_index
+
+            html_table = ["<table>"]
+
+            for index, row in enumerate(table_lines):
+                if index == 1:
+                    continue
+
+                cells = [cell.strip() for cell in row.strip("|").split("|")]
+                tag = "th" if index == 0 else "td"
+
+                html_table.append("<tr>")
+                for cell in cells:
+                    html_table.append(f"<{tag}>{inline_format(cell)}</{tag}>")
+                html_table.append("</tr>")
+
+            html_table.append("</table>")
+
+            return "\n".join(html_table), i
+
+        lines = markdown_text.splitlines()
+        html_parts = []
+        in_ul = False
+        i = 0
+
+        while i < len(lines):
+            line = lines[i].rstrip()
+            stripped = line.strip()
+
+            if not stripped:
+                if in_ul:
+                    html_parts.append("</ul>")
+                    in_ul = False
+                i += 1
+                continue
+
+            if stripped.startswith("|"):
+                table_html, new_index = parse_table(lines, i)
+                if table_html:
+                    if in_ul:
+                        html_parts.append("</ul>")
+                        in_ul = False
+                    html_parts.append(table_html)
+                    i = new_index
+                    continue
+
+            if stripped.startswith("#"):
+                if in_ul:
+                    html_parts.append("</ul>")
+                    in_ul = False
+
+                level = len(stripped) - len(stripped.lstrip("#"))
+                level = min(max(level, 1), 6)
+                title = stripped[level:].strip()
+                html_parts.append(f"<h{level}>{inline_format(title)}</h{level}>")
+                i += 1
+                continue
+
+            if stripped.startswith("- "):
+                if not in_ul:
+                    html_parts.append("<ul>")
+                    in_ul = True
+
+                item = stripped[2:].strip()
+                html_parts.append(f"<li>{inline_format(item)}</li>")
+                i += 1
+                continue
+
+            if in_ul:
+                html_parts.append("</ul>")
+                in_ul = False
+
+            html_parts.append(f"<p>{inline_format(stripped)}</p>")
+            i += 1
+
+        if in_ul:
+            html_parts.append("</ul>")
+
+        return "\n".join(html_parts)
+
+    assessment = query_db(
+        """
+        SELECT a.*, c.name as company_name
+        FROM assessments a
+        JOIN companies c ON a.company_id = c.id
+        WHERE a.id = %s
+        """,
+        (assessment_id,),
+        one=True
+    )
+
+    if not assessment:
+        flash("Avaliação não encontrada.")
+        return redirect(url_for("dashboard"))
+
+    pdti_markdown = assessment.get("pdti_markdown")
+
+    if not pdti_markdown or pdti_markdown.strip() == "":
+        flash("Nenhum PDTI foi gerado ainda. Gere o PDTI antes de baixar.")
+        return redirect(url_for("view_assessment", assessment_id=assessment_id))
 
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=f"{instrucoes}\n\n--- DADOS DA EMPRESA ---\n{contexto_dados}"
+        html_from_markdown = markdown_para_html_basico(pdti_markdown)
+
+        return render_template(
+            "pdti_pdf_template.html",
+            company_name=assessment["company_name"],
+            score=assessment.get("overall_score", 0),
+            content=html_from_markdown
         )
-        
-        # Pega a resposta da IA (que agora já vem em HTML) e joga direto pra tela!
-        html_from_ia = response.text.replace('```html', '').replace('```', '')
-        
-        return render_template("pdti_pdf_template.html", 
-                               company_name=assessment['company_name'], 
-                               score=assessment.get('overall_score', 0),
-                               content=html_from_ia)
-        
+
     except Exception as e:
-        flash(f"Erro ao gerar o PDTI: {str(e)}")
-        return redirect(url_for('view_assessment', assessment_id=assessment_id))
+        flash(f"Erro ao gerar o PDF do PDTI: {str(e)}")
+        return redirect(url_for("view_assessment", assessment_id=assessment_id))
     
 @app.route("/assessments/<int:assessment_id>")
 @require_login

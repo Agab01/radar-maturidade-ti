@@ -318,83 +318,140 @@
   </div>
 </div>
 
-<div class="actions-bottom-flex" style="display: flex; gap: 15px; justify-content: flex-end; border-top:var(--border-thick); padding-top:20px;"> 
-  <a class="btn secondary" href="{{ url_for('answer_assessment', assessment_id=assessment.id) }}">revisar_respostas</a> 
-  <button class="btn" onclick="window.print()">[ Imprimir_PDF ]</button> 
-  <a href="{{ url_for('download_pdti_pdf', assessment_id=assessment.id) }}" class="btn" style="background: #1a1a1a; color: #ccff00;">
-    [ Gerar e Baixar PDTI (IA) ]
+<div class="actions-bottom-flex"
+  style="display: flex; gap: 15px; justify-content: flex-end; border-top:var(--border-thick); padding-top:20px;">
+  
+  <a class="btn secondary" href="{{ url_for('answer_assessment', assessment_id=assessment.id) }}">
+    revisar_respostas
   </a>
+
+  <button class="btn" onclick="window.print()">
+    [ Imprimir_PDF ]
+  </button>
+
+  <button
+    type="button"
+    id="btnGerarBaixarPDTI"
+    class="btn"
+    onclick="gerarEBaixarPDTI(event)"
+    style="background: #1a1a1a; color: #ccff00;">
+    [ Gerar e Baixar PDTI (IA) ]
+  </button>
 </div>
 
-<script> 
-document.addEventListener("DOMContentLoaded", function () { 
-  {% if radar_labels and radar_data %} 
-  const ctxRadar = document.getElementById('radarChart').getContext('2d'); 
-  new Chart(ctxRadar, { 
-    type: 'radar', 
-    data: { 
-      labels: {{ radar_labels | tojson }}, 
-      datasets: [{ 
-        label: 'Maturidade (%)', 
-        data: {{ radar_data | tojson }}, 
-        backgroundColor: 'rgba(204, 255, 0, 0.4)', 
-        borderColor: '#1a1a1a', 
-        pointBackgroundColor: '#ff595e', 
-        pointBorderColor: '#1a1a1a', 
-        pointHoverBackgroundColor: '#fff', 
-        pointHoverBorderColor: '#1a1a1a', 
-        borderWidth: 3, 
-        pointRadius: 4, 
-        pointHoverRadius: 6 
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    {% if radar_labels and radar_data %}
+    const ctxRadar = document.getElementById('radarChart').getContext('2d');
+    new Chart(ctxRadar, {
+      type: 'radar',
+      data: {
+        labels: {{ radar_labels | tojson }},
+    datasets: [{
+      label: 'Maturidade (%)',
+      data: {{ radar_data | tojson }},
+    backgroundColor: 'rgba(204, 255, 0, 0.4)',
+    borderColor: '#1a1a1a',
+    pointBackgroundColor: '#ff595e',
+    pointBorderColor: '#1a1a1a',
+    pointHoverBackgroundColor: '#fff',
+    pointHoverBorderColor: '#1a1a1a',
+    borderWidth: 3,
+    pointRadius: 4,
+    pointHoverRadius: 6 
       }] 
-    }, 
-    options: { 
-      responsive: true, 
-      maintainAspectRatio: false, 
-      scales: { 
-        r: { 
-          angleLines: { color: 'rgba(0,0,0,0.2)' }, 
-          grid: { color: 'rgba(0,0,0,0.1)' }, 
-          pointLabels: { font: { family: "'Space Mono', monospace", size: 10, weight: 'bold' }, color: '#1a1a1a' }, 
-          ticks: { min: 0, max: 100, stepSize: 20, backdropColor: 'transparent', font: { family: "'Space Mono', monospace", size: 10 } } 
-        } 
-      }, 
-      plugins: { legend: { display: false } } 
-    } 
-  }); 
-  {% endif %} 
+    },
+    options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      r: {
+        angleLines: { color: 'rgba(0,0,0,0.2)' },
+        grid: { color: 'rgba(0,0,0,0.1)' },
+        pointLabels: { font: { family: "'Space Mono', monospace", size: 10, weight: 'bold' }, color: '#1a1a1a' },
+        ticks: { min: 0, max: 100, stepSize: 20, backdropColor: 'transparent', font: { family: "'Space Mono', monospace", size: 10 } }
+      }
+    },
+    plugins: { legend: { display: false } }
+  } 
+  });
+  {% endif %}
 
-  {% if history_labels and history_labels | length > 1 %} 
-  const ctxLine = document.getElementById('historyLineChart').getContext('2d'); 
-  new Chart(ctxLine, { 
-    type: 'line', 
-    data: { 
-      labels: {{ history_labels | tojson }}, 
-      datasets: [{ 
-        label: 'Score Geral (%)', 
-        data: {{ history_data | tojson }}, 
-        borderColor: '#ccff00', 
-        backgroundColor: 'rgba(204, 255, 0, 0.1)', 
-        borderWidth: 4, 
-        tension: 0.3, 
-        fill: true, 
-        pointRadius: 6, 
-        pointBackgroundColor: '#1a1a1a', 
-        pointBorderColor: '#ccff00', 
-        pointBorderWidth: 2 
+  {% if history_labels and history_labels | length > 1 %}
+  const ctxLine = document.getElementById('historyLineChart').getContext('2d');
+  new Chart(ctxLine, {
+    type: 'line',
+    data: {
+      labels: {{ history_labels | tojson }},
+    datasets: [{
+      label: 'Score Geral (%)',
+      data: {{ history_data | tojson }},
+    borderColor: '#ccff00',
+    backgroundColor: 'rgba(204, 255, 0, 0.1)',
+    borderWidth: 4,
+    tension: 0.3,
+    fill: true,
+    pointRadius: 6,
+    pointBackgroundColor: '#1a1a1a',
+    pointBorderColor: '#ccff00',
+    pointBorderWidth: 2 
       }] 
-    }, 
-    options: { 
-      responsive: true, 
-      maintainAspectRatio: false, 
-      scales: { 
-        y: { min: 0, max: 100, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { family: "'Space Mono', monospace" } } }, 
-        x: { grid: { display: false }, ticks: { font: { family: "'Space Mono', monospace", weight: 'bold' } } } 
-      }, 
-      plugins: { legend: { display: false } } 
-    } 
-  }); 
+    },
+    options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: { min: 0, max: 100, grid: { color: 'rgba(0,0,0,0.1)' }, ticks: { font: { family: "'Space Mono', monospace" } } },
+      x: { grid: { display: false }, ticks: { font: { family: "'Space Mono', monospace", weight: 'bold' } } }
+    },
+    plugins: { legend: { display: false } }
+  } 
+  });
   {% endif %} 
 }); 
-</script> 
+</script>
+
+<script>
+async function gerarEBaixarPDTI(event) {
+  if (event) {
+    event.preventDefault();
+  }
+
+  const btn = document.getElementById("btnGerarBaixarPDTI");
+  const textoOriginal = btn.innerText;
+
+  const generateUrl = "{{ url_for('generate_pdti', assessment_id=assessment.id) }}";
+  const downloadUrl = "{{ url_for('download_pdti_pdf', assessment_id=assessment.id) }}";
+
+  try {
+    btn.disabled = true;
+    btn.innerText = "[ Gerando PDTI... aguarde ]";
+
+    const response = await fetch(generateUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "XMLHttpRequest"
+      }
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || data.status !== "success") {
+      throw new Error(data.message || "Erro ao gerar o PDTI.");
+    }
+
+    btn.innerText = "[ Baixando PDTI... ]";
+
+    window.location.href = downloadUrl;
+
+  } catch (error) {
+    console.error("Erro ao gerar PDTI:", error);
+    alert(error.message || "Erro ao gerar e baixar o PDTI.");
+
+    btn.disabled = false;
+    btn.innerText = textoOriginal;
+  }
+}
+</script>
 {% endblock %}

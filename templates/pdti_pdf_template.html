@@ -1,87 +1,146 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <title>Plano Diretor de TI</title>
     <style>
-        /* Regra @page adaptada para xhtml2pdf */
         @page {
-            size: A4;
-            margin-top: 2cm;
-            margin-bottom: 2.5cm;
-            margin-left: 1.5cm;
-            margin-right: 1.5cm;
-            
-            /* Define um "quadro" no rodapé para receber o texto */
+            size: A4 landscape;
+            margin-top: 0.8cm;
+            margin-bottom: 1.4cm;
+            margin-left: 0.8cm;
+            margin-right: 0.8cm;
+
             @frame footer_frame {
                 -pdf-frame-content: footer_content;
-                left: 1.5cm;
-                right: 1.5cm;
-                bottom: 1cm;
-                height: 1cm;
+                left: 0.8cm;
+                right: 0.8cm;
+                bottom: 0.5cm;
+                height: 0.8cm;
             }
         }
-        
+
         body {
             font-family: Helvetica, Arial, sans-serif;
             color: #1a1a1a;
-            line-height: 1.5;
-            font-size: 11pt;
+            line-height: 1.4;
+            font-size: 9pt;
         }
-        
+
         .header {
             background-color: #000000;
             color: #ccff00;
-            padding: 20px;
-            margin-bottom: 30px;
+            padding: 14px;
+            margin-bottom: 18px;
         }
-        
+
         .header h1 {
             margin: 0;
-            font-size: 24pt;
+            font-size: 20pt;
         }
-        
+
         .header p {
             color: #ffffff;
             margin: 5px 0 0 0;
-            font-size: 12pt;
+            font-size: 10pt;
         }
-        
-        /* O conteúdo gerado pela IA entra aqui */
+
+        h1 {
+            font-size: 18pt;
+            margin-top: 14px;
+            margin-bottom: 10px;
+            page-break-after: avoid;
+        }
+
         h2 {
             color: #000000;
             border-left: 5px solid #ccff00;
-            padding-left: 10px;
-            margin-top: 25px;
-            margin-bottom: 15px;
-            padding-bottom: 5px;
+            padding-left: 8px;
+            margin-top: 18px;
+            margin-bottom: 10px;
+            padding-bottom: 4px;
+            font-size: 15pt;
+            page-break-after: avoid;
         }
-        
+
         h3 {
             color: #333333;
-            margin-top: 20px;
+            margin-top: 14px;
+            margin-bottom: 8px;
+            font-size: 12pt;
+            page-break-after: avoid;
         }
-        
+
+        p {
+            margin: 6px 0;
+        }
+
+        ul,
+        ol {
+            margin-top: 6px;
+            margin-bottom: 8px;
+            padding-left: 18px;
+        }
+
+        li {
+            margin-bottom: 3px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
-            margin: 20px 0;
+            table-layout: fixed;
+            font-size: 7.5pt;
+            margin: 10px 0;
+            page-break-inside: auto;
         }
-        
-        th, td {
-            border: 1px solid #dddddd;
-            padding: 8px;
+
+        thead {
+            display: table-header-group;
+        }
+
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+
+        th,
+        td {
+            border: 1px solid #d0d0d0;
+            padding: 4px;
             text-align: left;
+            vertical-align: top;
+            word-wrap: break-word;
+            overflow-wrap: anywhere;
         }
-        
+
         th {
             background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        strong {
+            font-weight: bold;
+        }
+
+        .content {
+            width: 100%;
+        }
+
+        #footer_content {
+            text-align: right;
+            font-size: 8pt;
+            color: #666666;
+            border-top: 1px solid #cccccc;
+            padding-top: 4px;
         }
     </style>
 </head>
+
 <body>
 
-    <div id="footer_content" style="text-align: right; font-size: 9pt; color: #666666; border-top: 1px solid #cccccc; padding-top: 5px;">
+    <div id="footer_content">
         PDTI - {{ company_name }} | Página <pdf:pagenumber> de <pdf:pagecount>
     </div>
 
@@ -95,4 +154,5 @@
     </div>
 
 </body>
+
 </html>
