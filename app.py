@@ -1071,9 +1071,9 @@ Esta seção é obrigatória.
 REGRA OBRIGATÓRIA DE PRIORIDADE:
 A coluna "Prioridade" do plano 5W2H deve copiar exatamente o campo "Prioridade" recebido em cada PLANO DE AÇÃO 5W2H.
 
-É proibido recalcular, reinterpretar ou alterar a prioridade.
+É proibido recalcular, reinterpretar, aumentar ou diminuir a prioridade.
 
-Riscos com classificação "Crítico" jamais podem aparecer como prioridade "Baixa" ou "Média".
+A prioridade deve seguir exatamente o Score de Risco informado no contexto.
 
 Use obrigatoriamente:
 - Score 20 a 25: Altíssima
@@ -1081,6 +1081,17 @@ Use obrigatoriamente:
 - Score 11 a 15: Média
 - Score 6 a 10: Baixa
 - Score 1 a 5: Baixa
+
+REGRA OBRIGATÓRIA DE NÃO SUPERCLASSIFICAÇÃO:
+A classificação "Crítico" não significa automaticamente prioridade "Altíssima".
+
+Riscos com Score 16, 17, 18 ou 19 devem aparecer como prioridade "Alta", nunca "Altíssima", "Média" ou "Baixa".
+
+Riscos com Score 20, 21, 22, 23, 24 ou 25 devem aparecer como prioridade "Altíssima".
+
+Riscos com classificação "Crítico" jamais podem aparecer como prioridade "Baixa" ou "Média".
+
+É proibido usar o prazo, o custo ou a facilidade de execução para alterar a prioridade calculada pelo Score de Risco.
 
 Crie uma tabela 5W2H com ações priorizadas para os primeiros 90 dias.
 
@@ -1095,12 +1106,13 @@ Regras:
 - Não transforme o 5W2H em lista.
 - Não omita custo, prazo ou responsável quando forem fornecidos.
 - Se algum campo não existir, escreva "Não informado".
-- Priorize ações com prazo dentro dos primeiros 90 dias.
+- Priorize ações com prazo dentro dos primeiros 90 dias, mas sem alterar a prioridade calculada pelo Score de Risco.
 - Ações ligadas a riscos críticos devem aparecer primeiro.
 - Cada ação precisa estar conectada a um risco mitigado.
 - O campo "Risco Mitigado" deve apontar claramente qual risco da matriz está sendo tratado.
 - A coluna "Prioridade" deve usar exatamente o valor informado em "Prioridade Obrigatória da Ação".
-- Nunca classifique como "Baixa" uma ação cujo risco mitigado tenha classificação "Crítico".
+- Nunca classifique como "Baixa" ou "Média" uma ação cujo risco mitigado tenha classificação "Crítico".
+- Nunca classifique como "Altíssima" uma ação cujo Score de Risco esteja entre 16 e 19.
 - Ordene as ações por prioridade: Altíssima, Alta, Média e Baixa.
 
 ## 6. Plano Diretor de Ações Estratégicas — 2026-2028
@@ -1139,7 +1151,7 @@ Regras:
 
 Esta seção é obrigatória.
 
-Classifique os custos das ações entre CAPEX e OPEX.
+Classifique os custos das ações entre CAPEX, OPEX, Sem custo direto ou Custo não mensurado.
 
 Use a tabela:
 
@@ -1147,25 +1159,59 @@ Use a tabela:
 |---|---|---:|---|
 
 Critérios:
-- CAPEX = investimento em aquisição, implantação, infraestrutura, sistemas, consultoria de implantação, integração ou ativo tecnológico.
-- OPEX = despesa recorrente, mensalidade, SaaS, suporte, operação, treinamento recorrente ou serviço contínuo.
+- CAPEX = investimento pontual em aquisição, implantação, infraestrutura, sistemas, consultoria de implantação, integração, desenvolvimento, homologação ou ativo tecnológico.
+- OPEX = despesa operacional recorrente, mensalidade, SaaS, suporte, operação, treinamento recorrente, licenciamento recorrente, armazenamento em nuvem, consumo de cloud, monitoramento, logs, tráfego, ferramentas de segurança ou serviço contínuo.
+- Sem custo direto = ação interna, administrativa, processual, de governança, reunião, definição de política, criação de comitê, revisão de processo, formalização de fluxo, elaboração interna de documento ou atividade executada pela equipe sem custo adicional informado.
+- Custo não mensurado = ação que possui custo provável, mas cujo valor não foi informado de forma numérica ou consolidável, como “custo AWS”, “aumento de consumo cloud”, “licenciamento da plataforma”, “custo de tráfego”, “CloudWatch”, “WAF”, “SIEM”, “ITSM”, “ferramenta a contratar”, “consultoria a definir” ou expressões semelhantes.
 - Se o custo informado for "R$ 0,00", "0", "0,00", "-", ou indicar ausência de custo direto, classifique o Tipo de Gasto como "Sem custo direto".
 - Para ações sem custo direto, a justificativa deve explicar que se trata de ação interna, administrativa, processual, de governança ou organizacional.
 - Não use "Não informado" quando o valor estiver claramente indicado como R$ 0,00.
-- Use "Não informado" apenas quando realmente não houver dado de custo.
+- Use "Não informado" apenas quando realmente não houver qualquer dado de custo.
 - Não invente valores.
 - Se o custo for mensal, mantenha como mensal.
 - Se o custo for único, mantenha como único.
+- Se o custo estiver em faixa, por exemplo "R$ 12 a 18 milhões", mantenha como faixa e não some com valores fixos.
+- Se o custo estiver em moeda estrangeira, mantenha separado e não converta, a menos que a conversão tenha sido fornecida.
+- Não some valores mensais com valores únicos.
+- Não some valores em reais com valores em dólar.
+- Não some valores em faixa com valores fixos.
+- Não transforme custo não mensurado em R$ 0,00.
 
-Depois da tabela, apresente um resumo:
+REGRA OBRIGATÓRIA DE CONSOLIDAÇÃO FINANCEIRA:
 
-| Total CAPEX Identificado | Total OPEX Mensal Identificado | Observação |
-|---:|---:|---|
+A seção financeira deve separar claramente:
+1. Valores numéricos conhecidos;
+2. Valores recorrentes/mensais;
+3. Valores estimados em faixa;
+4. Valores não mensurados ou dependentes de contratação futura;
+5. Ações sem custo direto.
 
-Regras:
-- Some apenas valores claramente numéricos.
+Não escreva apenas "Não consolidado" quando existirem valores financeiros identificáveis no diagnóstico ou no plano de ação.
+
+Quando houver valores numéricos claros, consolide-os parcialmente.
+
+Depois da tabela de CAPEX/OPEX, apresente obrigatoriamente um resumo financeiro consolidado parcial:
+
+| Categoria | Valor Consolidado | Observação |
+|---|---:|---|
+| CAPEX conhecido | ... | Somar apenas investimentos pontuais claramente numéricos |
+| OPEX mensal conhecido | ... | Somar apenas custos recorrentes/mensais claramente numéricos |
+| Valores em faixa | ... | Informar faixas como "R$ X a R$ Y", sem somar com valores fixos |
+| Custos não mensurados | Não consolidado | Listar exemplos de custos sem valor definido |
+| Ações sem custo direto | R$ 0,00 | Considerar apenas ações internas, administrativas ou processuais |
+
+Regras do resumo financeiro:
+- Some apenas valores claramente numéricos e comparáveis.
 - Não some valores ambíguos.
-- Quando não for possível somar, escreva "Não consolidado por ausência de dados padronizados".
+- Não some valores mensais com valores únicos.
+- Não some valores em faixa com valores fixos.
+- Não some valores em reais com valores em dólar.
+- Quando houver valores numéricos fixos, apresente a consolidação parcial.
+- Quando houver valores mensais, apresente-os separadamente como OPEX mensal conhecido.
+- Quando houver faixas, apresente-as separadamente em "Valores em faixa".
+- Quando houver custos sem valor definido, classifique-os como "Custos não mensurados".
+- Quando não for possível consolidar tudo, escreva: "Consolidação parcial realizada com base nos valores disponíveis; custos não mensurados exigem detalhamento posterior."
+- O resumo deve valorizar os dados existentes, mesmo quando a consolidação total não for possível.
 
 ## 8. Curva S Financeira e Técnica
 
